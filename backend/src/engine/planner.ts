@@ -32,12 +32,14 @@ async function buy(checkId: string, plan: Plan, round: 1 | 2, tracker: SpendTrac
  * Round 1: buy the cheap intents (Telegraph routes to a miner).
  * If the answers agree -> stop. Otherwise Round 2: same intent from more top-ranked miners.
  */
-export async function runPlan(checkId: string, plans: Plan[], tracker: SpendTracker): Promise<{ purchases: Purchase[]; escalated: boolean }> {
+export async function runPlan(checkId: string, plans: Plan[], tracker: SpendTracker, opts: { popular?: boolean } = {}): Promise<{ purchases: Purchase[]; escalated: boolean }> {
   const purchases: Purchase[] = [];
   const r1 = (await Promise.all(plans.map((p) => buy(checkId, p, 1, tracker).catch((e) => ({ receipt: { intent: p.intent, minerId: 'routed', costUsd: 0, signalHash: '', round: 1 as const }, signal: { intent: p.intent, minerId: null, flagged: null }, ok: false, error: String(e.message ?? e) }) as Purchase)))).filter((x): x is Purchase => !!x);
   purchases.push(...r1);
 
   if (signalsAgree(r1.map((p) => p.signal))) return { purchases, escalated: false };
+  // Well-known site and nobody flagged it: more miners cannot change the verdict (needs 2+ flags), so don't spend.
+  if (opts.popular && !r1.some((p) => p.signal.flagged === true)) return { purchases, escalated: false };
 
   // Not sure -> the agent decides to buy more: 2 extra miners for the lead intent, never the ones already used.
   const lead = plans[0];

@@ -42,11 +42,12 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 - ✅ First real paid call on escrow + receipt saved in Neon (see docs/RECEIPTS.md)
 - ✅ Neon schema (`checks`, `purchases`, `cache`, `spend`)
 - ✅ Link check engine: planner with escalation (Round 1 → Round 2) + deterministic verdict (verified live on a known-bad link)
+- ✅ False-alarm fixes (Nov 18): bundled popular-domain list (google.com never 🟡), majority vote after escalation, one vote per miner, Round 2 miners chosen by leaderboard rank, "unknown is not safe" (see docs/LINK_TESTS.md). No reliable 🔴-after-escalation demo link yet: find a live phishing URL from OpenPhish/PhishTank on demo day
 
 ## Nov 19 — Bot + deploy
 - ✅ Telegram bot, DM mode (webhook, secret check) — tested locally with simulated updates
 - ✅ Group guard code done; BotFather privacy disabled (needs a live test in a real group)
-- 🔄 Deploy to Render: service `verita` created (https://verita-znay.onrender.com), build OK; waiting for secrets DATABASE_URL, EVM_PRIVATE_KEY, TELEGRAM_BOT_TOKEN in the Render dashboard; then confirm setWebhook + /health. UptimeRobot still todo
+- ✅ Deploy to Render: https://verita-znay.onrender.com, secrets set, `/health` = 200, Telegram webhook set (`/telegram/webhook`, 0 pending, no errors). UptimeRobot ping on `/health` still todo
 
 ## Nov 20 — SHOWCASE
 - ⬜ Demo: scam link posted in a group → automatic 🔴 + receipts

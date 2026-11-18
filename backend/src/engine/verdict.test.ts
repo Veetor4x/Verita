@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { linkVerdict, signalsAgree, toSignal, type Signal } from './verdict.js';
 
-const s = (flagged: boolean | null): Signal => ({ intent: 'X', minerId: '1', flagged });
+let n = 0; // every test signal comes from a different miner (independent source)
+const s = (flagged: boolean | null): Signal => ({ intent: 'X', minerId: String(++n), flagged });
 
 test('2+ sources flag -> SCAM', () => assert.equal(linkVerdict([s(true), s(true)]).verdict, 'SCAM'));
 test('1 flag -> CAREFUL', () => assert.equal(linkVerdict([s(true), s(false)]).verdict, 'CAREFUL'));
@@ -17,3 +18,64 @@ test('agreement needs 2 usable and equal', () => {
 });
 test('toSignal reads safe:false as flagged', () => assert.equal(toSignal('U', '1', { safe: false }).flagged, true));
 test('toSignal nulls on field error', () => assert.equal(toSignal('U', '1', { safe: true }, { safe: 'error' }).flagged, null));
+
+// ---- popular domains + majority vote ----
+import { isPopularDomain } from './popular-domains.js';
+
+test('popular: google.com and www.google.com match', () => {
+  assert.equal(isPopularDomain('https://google.com/'), true);
+  assert.equal(isPopularDomain('https://www.google.com/search?q=x'), true);
+  assert.equal(isPopularDomain('GOOGLE.COM'), true);
+});
+test('popular: lookalikes and tricks do NOT match', () => {
+  for (const u of ['https://google.com.evil.xyz/', 'https://g00gle.com/', 'https://google.com@evil.xyz/', 'https://evilgoogle.com/',
+    'https://sites.google.com/view/x', 'https://docs.google.com/forms/x', 'https://foo.github.io/', 'https://paypa1.com/', 'https://xn--ggle-0nda.com/'])
+    assert.equal(isPopularDomain(u), false, u);
+});
+test('popular + 0 or 1 flag -> SAFE (never CAREFUL)', () => {
+  assert.equal(linkVerdict([s(false), s(false)], { popular: true }).verdict, 'SAFE');
+  assert.equal(linkVerdict([s(true), s(false)], { popular: true }).verdict, 'SAFE');
+  assert.equal(linkVerdict([s(true), s(false), s(false), s(false)], { popular: true }).verdict, 'SAFE');
+  assert.equal(linkVerdict([s(null), s(null)], { popular: true }).verdict, 'SAFE');
+});
+test('popular + 2 flags -> normal rules apply (not forced SAFE)', () => {
+  assert.equal(linkVerdict([s(true), s(true)], { popular: true }).verdict, 'SCAM');
+  assert.equal(linkVerdict([s(true), s(true), s(false), s(false)], { popular: true }).verdict, 'CAREFUL'); // 2-2 tie
+});
+test('majority vote with 3+ answers', () => {
+  assert.equal(linkVerdict([s(true), s(true), s(true), s(false)]).verdict, 'SCAM');   // 3 of 4
+  assert.equal(linkVerdict([s(true), s(true), s(false)]).verdict, 'SCAM');            // 2 of 3
+  assert.equal(linkVerdict([s(true), s(true), s(false), s(false)]).verdict, 'CAREFUL'); // tie
+  assert.equal(linkVerdict([s(true), s(false), s(false), s(false)]).verdict, 'CAREFUL'); // 1 of 4
+  assert.equal(linkVerdict([s(false), s(false), s(false), s(false)]).verdict, 'SAFE');
+});
+test('verdict does not depend on signal order', () => {
+  const a = [s(true), s(false), s(true), s(false)];
+  assert.equal(linkVerdict(a).verdict, linkVerdict([...a].reverse()).verdict);
+});
+test('Round 1 rules unchanged for 2 answers', () => {
+  assert.equal(linkVerdict([s(true), s(true)]).verdict, 'SCAM');
+  assert.equal(linkVerdict([s(true), s(false)]).verdict, 'CAREFUL');
+  assert.equal(linkVerdict([s(true), s(null)]).verdict, 'CAREFUL');
+});
+
+import { onePerMiner } from './verdict.js';
+const m = (minerId: string, flagged: boolean | null): Signal => ({ intent: 'X', minerId, flagged });
+test('same miner answering twice is ONE vote (no fake agreement)', () => {
+  assert.equal(onePerMiner([m('302', false), m('302', false)]).length, 1);
+  assert.equal(signalsAgree([m('302', false), m('302', false)]), false); // only 1 independent source -> keep buying
+  assert.equal(linkVerdict([m('302', true), m('302', true)]).verdict, 'CAREFUL'); // 1 source flagged, not 2
+});
+test('miner flagged if any of its answers flagged', () => {
+  assert.equal(onePerMiner([m('1', false), m('1', true)])[0].flagged, true);
+  assert.equal(onePerMiner([m('1', null), m('1', false)])[0].flagged, false);
+});
+
+test('unknown is not safe: a lone "ok" answer -> CAREFUL, not SAFE', () => {
+  assert.equal(linkVerdict([m('302', false), m('7334', null), m('731006', null)]).verdict, 'CAREFUL');
+  assert.equal(linkVerdict([m('302', false), m('302', false)]).verdict, 'CAREFUL'); // same miner twice = 1 source
+  assert.equal(linkVerdict([m('302', false), m('7334', false)]).verdict, 'SAFE');
+});
+test('popular domain stays SAFE even with a lone answer', () => {
+  assert.equal(linkVerdict([m('302', false), m('302', false)], { popular: true }).verdict, 'SAFE');
+});
