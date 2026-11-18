@@ -13,6 +13,7 @@ const BAD = [
 ];
 const GOOD = ['https://www.google.com/', 'https://github.com/', 'https://www.wikipedia.org/'];
 const runs = Number(process.argv[2] || 3);
+const extra = process.argv.slice(3); // optional: test only these URLs (all treated as BAD candidates)
 const icon = { SAFE: '🟢', CAREFUL: '🟡', SCAM: '🔴' };
 
 await migrate();
@@ -31,10 +32,10 @@ async function one(url) {
   return out;
 }
 
-const all = [...BAD.map((u) => ['BAD', u]), ...GOOD.map((u) => ['GOOD', u])];
+const all = extra.length ? extra.map((u) => ['TEST', u]) : [...BAD.map((u) => ['BAD', u]), ...GOOD.map((u) => ['GOOD', u])];
 const results = [];
-for (let i = 0; i < all.length; i += 3) {
-  const batch = all.slice(i, i + 3); // 3 links at a time
+for (let i = 0; i < all.length; i += 2) {
+  const batch = all.slice(i, i + 2); // 2 links at a time
   results.push(...(await Promise.all(batch.map(async ([kind, url]) => ({ kind, url, out: await one(url) })))));
 }
 
