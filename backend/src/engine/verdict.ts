@@ -145,13 +145,5 @@ export function linkVerdict(miners: Signal[], facts: LinkFacts = {}): { verdict:
   if (!(brand && minerFlags === 0 && verdict === 'CAREFUL' && clean === 0)) reasons.push(why);
   reasons.push(bought);
   if (young) reasons.push(`The domain is only ${facts.domainAgeDays} days old.`);
-  return { verdict, reasons: withBrandReason(reasons, brand, flagged, clean) };
-}
-
-/** Brand reason goes first (worst first). If the brand check is the ONLY flag, drop the vague "1 source flagged" line. */
-function withBrandReason(reasons: string[], brand: LinkFacts['brandImpersonation'], flagged: number, clean: number): string[] {
-  if (!brand) return reasons.slice(0, 3);
-  const line = `Pretends to be ${brand.brand}, but isn't the official site (${brand.officialDomain}).`;
-  const rest = flagged === 1 && clean === 0 ? reasons.filter((r) => !/no other source could confirm/.test(r)) : reasons;
-  return [line, ...rest].slice(0, 3);
+  return { verdict, reasons: reasons.slice(0, 3) };
 }
