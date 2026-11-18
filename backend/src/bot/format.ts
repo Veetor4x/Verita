@@ -6,7 +6,8 @@ export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
 const TITLE = { SAFE: '🟢 Looks safe', CAREFUL: '🟡 Be careful', SCAM: '🔴 Likely scam' } as const;
 
 export function formatResult(r: CheckResult): string {
-  const rounds = Math.max(0, ...r.details.receipts.map((x) => x.round));
+  const escalated = r.details.receipts.filter((x) => x.round === 2).length;
+  const cost = `$${r.details.totalCostUsd.toFixed(2)}`;
   const lines = [
     `<b>${TITLE[r.verdict]}</b>`,
     `<code>${esc(r.input.slice(0, 200))}</code>`,
@@ -15,7 +16,9 @@ export function formatResult(r: CheckResult): string {
     '',
     r.details.cached
       ? '<i>Served from cache, $0.</i>'
-      : `<i>Bought ${r.details.receipts.length} signals in ${rounds} round${rounds > 1 ? 's' : ''}${rounds > 1 ? ' (agent escalated)' : ''}, $${r.details.totalCostUsd.toFixed(2)}.</i>`,
+      : escalated > 0
+        ? `<i>The first answers were not clear, so the agent bought ${escalated} more. Total ${cost}.</i>`
+        : `<i>Total ${cost}.</i>`,
     '',
     `⚠️ ${esc(DISCLAIMER.replace(/^⚠️\s*/, ''))}`,
   ];

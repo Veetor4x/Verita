@@ -69,3 +69,25 @@ export async function findCachedCheck(kind: string, input: string): Promise<Chec
   )) as any[];
   return rows[0]?.result ?? null;
 }
+
+// ---- public stats (/stats) ----
+export type Stats = {
+  checks: number; cacheHits: number; spentUsd: number; receipts: number; escalated: number;
+  latest: { signalHash: string; intent: string; minerId: string | null; round: number; at: string }[];
+};
+
+export async function getStats(): Promise<Stats> {
+  const [c, p, e, latest] = await Promise.all([
+    // A "check" = anything that bought at least one signal (distinct check_id in purchases, includes engine test runs)
+    // plus cache hits (served at $0, never in purchases).
+    sql().query(`select ((select count(distinct check_id) from purchases where check_id is not null) + (select count(*) from checks where cached))::int as checks,
+                        (select count(*) from checks where cached)::int as cache_hits`),
+    sql().query(`select coalesce(sum(cost_usd),0)::float as spent, count(*) filter (where signal_hash is not null and signal_hash <> '')::int as receipts from purchases`),
+    sql().query(`select count(distinct check_id)::int as escalated from purchases where round = 2 and check_id is not null`),
+    sql().query(`select signal_hash, intent, miner_id, round, created_at from purchases where signal_hash is not null and signal_hash <> '' order by created_at desc limit 10`),
+  ]) as any[][];
+  return {
+    checks: c[0].checks, cacheHits: c[0].cache_hits, spentUsd: Number(p[0].spent), receipts: p[0].receipts, escalated: e[0].escalated,
+    latest: latest.map((r: any) => ({ signalHash: r.signal_hash, intent: r.intent, minerId: r.miner_id, round: r.round, at: new Date(r.created_at).toISOString() })),
+  };
+}

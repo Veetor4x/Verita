@@ -79,3 +79,39 @@ test('unknown is not safe: a lone "ok" answer -> CAREFUL, not SAFE', () => {
 test('popular domain stays SAFE even with a lone answer', () => {
   assert.equal(linkVerdict([m('302', false), m('302', false)], { popular: true }).verdict, 'SAFE');
 });
+
+// ---- counts must match what was bought ----
+import { boughtLine } from './verdict.js';
+const brand = { brand: 'PayPal', officialDomain: 'paypal.com' };
+
+test('boughtLine: the example from the brief, exactly', () => {
+  assert.equal(boughtLine([m('a', true), m('b', false), m('c', null), m('d', null)]), "4 checks bought: 1 flagged it, 1 found no threat, 2 couldn't check this link.");
+});
+test('boughtLine: singular, zero parts omitted, none bought', () => {
+  assert.equal(boughtLine([m('a', false)]), '1 check bought: 1 found no threat.');
+  assert.equal(boughtLine([m('a', true), m('b', true)]), '2 checks bought: 2 flagged it.');
+  assert.equal(boughtLine([]), 'No checks could be bought.');
+});
+test('counts count purchases, not de-duplicated miners (same miner answering twice = 2 bought)', () => {
+  assert.equal(boughtLine([m('302', false), m('302', false)]), '2 checks bought: 2 found no threat.');
+});
+test('reasons never say "X of Y sources" and the bought line matches the purchases', () => {
+  const cases: [Signal[], any][] = [
+    [[m('a', true), m('b', false), m('c', null), m('d', null)], {}],
+    [[m('a', true), m('b', false)], { brandImpersonation: brand }],
+    [[m('302', false), m('302', false)], {}],
+    [[m('a', null), m('b', null)], { brandImpersonation: brand }],
+    [[m('a', false), m('b', false)], { popular: true }],
+  ];
+  for (const [sigs, facts] of cases) {
+    const r = linkVerdict(sigs, facts);
+    assert.ok(r.reasons.length <= 3);
+    assert.ok(r.reasons.every((x) => !/\d+ of \d+/.test(x)), r.reasons.join(' | '));
+    assert.ok(r.reasons.includes(boughtLine(sigs)), r.reasons.join(' | '));
+  }
+});
+test('brand-only flag: brand line + bought line, no vague sentence', () => {
+  const r = linkVerdict([m('a', null), m('b', null)], { brandImpersonation: brand });
+  assert.equal(r.verdict, 'CAREFUL');
+  assert.deepEqual(r.reasons, ["Pretends to be PayPal, but isn't the official site (paypal.com).", "2 checks bought: 2 couldn't check this link."]);
+});

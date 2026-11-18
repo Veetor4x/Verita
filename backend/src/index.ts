@@ -2,9 +2,9 @@
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
-import { migrate, getCheck } from './db/index.js';
+import { migrate, getCheck, getStats } from './db/index.js';
 import { createBot } from './bot/index.js';
-import { resultPage } from './web/pages.js';
+import { resultPage, statsPage } from './web/pages.js';
 
 process.on('unhandledRejection', (e) => console.error('unhandled:', (e as Error)?.message ?? e));
 
@@ -18,6 +18,15 @@ app.get('/health', (_req, res) => { res.json({ ok: true }); });
 app.get('/api/check/:id', async (req, res) => {
   const r = await getCheck(req.params.id).catch(() => null);
   r ? res.json(r) : res.status(404).json({ error: 'not found' });
+});
+
+// Public stats: counts and signal hashes only (never the links people checked).
+app.get('/api/stats', async (_req, res) => {
+  try { res.set('Cache-Control', 'public, max-age=30').json(await getStats()); } catch { res.status(500).json({ error: 'stats unavailable' }); }
+});
+app.get('/stats', async (_req, res) => {
+  try { res.set('Cache-Control', 'public, max-age=30').type('html').send(statsPage(await getStats())); }
+  catch { res.status(500).type('text').send('Stats are not available right now.'); }
 });
 
 app.get('/c/:id', async (req, res) => {
