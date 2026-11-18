@@ -6,12 +6,12 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 
 ## Nov 18 — Rename + first paid call + link engine
 - ✅ Rename project to Verità (CLAUDE.md, README, docs)
-- ⬜ Project skeleton: `backend/` (package `verita-backend`), tsconfig, `.env.example`, `shared/types.ts`
-- ⬜ Wallet setup script (`scripts/setup-wallet.mjs`, burner testnet wallet)
-- ⬜ Telegraph client: discovery (intents, miners, prices) + paid `/ask` via x402 with spend controls
-- ⬜ First real paid call (`scripts/test-purchase.mjs`) + receipt saved in Neon
-- ⬜ Neon schema (`checks`, `purchases`, `cache`, `spend`)
-- ⬜ Link check engine: planner with escalation (Round 1 → Round 2) + deterministic verdict
+- ✅ Project skeleton: `backend/` (package `verita-backend`), tsconfig, `.env.example`, `shared/types.ts`
+- ✅ Wallet setup script (`scripts/setup-wallet.mjs`, burner testnet wallet)
+- ✅ Telegraph client: discovery (intents, miners, prices) + paid `/ask` via x402 with spend controls
+- 🔄 First real paid call (blocked: Telegraph facilitator settle timeouts) (`scripts/test-purchase.mjs`) + receipt saved in Neon
+- ✅ Neon schema (`checks`, `purchases`, `cache`, `spend`)
+- 🔄 Link check engine: planner with escalation (Round 1 → Round 2) + deterministic verdict
 
 ## Nov 19 — Bot + deploy
 - ⬜ Telegram bot, DM mode (webhook, secret check)
