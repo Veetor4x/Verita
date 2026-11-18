@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { linkVerdict, signalsAgree, toSignal, type Signal } from './verdict.js';
 
-const s = (flagged: boolean | null): Signal => ({ intent: 'X', minerId: '1', flagged });
+let n = 0; // every test signal comes from a different miner (independent source)
+const s = (flagged: boolean | null): Signal => ({ intent: 'X', minerId: String(++n), flagged });
 
 test('2+ sources flag -> SCAM', () => assert.equal(linkVerdict([s(true), s(true)]).verdict, 'SCAM'));
 test('1 flag -> CAREFUL', () => assert.equal(linkVerdict([s(true), s(false)]).verdict, 'CAREFUL'));
@@ -56,4 +57,16 @@ test('Round 1 rules unchanged for 2 answers', () => {
   assert.equal(linkVerdict([s(true), s(true)]).verdict, 'SCAM');
   assert.equal(linkVerdict([s(true), s(false)]).verdict, 'CAREFUL');
   assert.equal(linkVerdict([s(true), s(null)]).verdict, 'CAREFUL');
+});
+
+import { onePerMiner } from './verdict.js';
+const m = (minerId: string, flagged: boolean | null): Signal => ({ intent: 'X', minerId, flagged });
+test('same miner answering twice is ONE vote (no fake agreement)', () => {
+  assert.equal(onePerMiner([m('302', false), m('302', false)]).length, 1);
+  assert.equal(signalsAgree([m('302', false), m('302', false)]), false); // only 1 independent source -> keep buying
+  assert.equal(linkVerdict([m('302', true), m('302', true)]).verdict, 'CAREFUL'); // 1 source flagged, not 2
+});
+test('miner flagged if any of its answers flagged', () => {
+  assert.equal(onePerMiner([m('1', false), m('1', true)])[0].flagged, true);
+  assert.equal(onePerMiner([m('1', null), m('1', false)])[0].flagged, false);
 });
