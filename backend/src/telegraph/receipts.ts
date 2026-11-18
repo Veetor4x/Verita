@@ -26,14 +26,15 @@ const pick = (o: Record<string, unknown> | null, ...keys: string[]): string | un
 /** Pull signal_hash / receipt_hash out of response headers + JSON body. */
 export function decodeReceipt(headers: Headers, body: unknown): DecodedReceipt {
   const telegraphHeader = decodeMaybeJson(headers.get('x-telegraph-receipt'));
-  const paymentHeader = decodeMaybeJson(headers.get('payment-response') || headers.get('x-payment-response'));
+  const paymentHeader = decodeMaybeJson(headers.get('x-payment-response') || headers.get('payment-response'));
   const th = typeof telegraphHeader === 'object' ? telegraphHeader : null;
   const ph = typeof paymentHeader === 'object' ? paymentHeader : null;
   const b = body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
 
   const signalHash = pick(th, 'signal_hash', 'signalHash') ?? pick(b, 'signal_hash', 'signalHash')
     ?? pick((b?.receipt as Record<string, unknown>) ?? null, 'signal_hash', 'signalHash');
-  const receiptHash = pick(th, 'receipt_hash', 'receiptHash', 'hash')
+  // Escrow: receipt_hash lives in X-PAYMENT-RESPONSE. (x402 / X-TELEGRAPH-RECEIPT kept as fallbacks.)
+  const receiptHash = pick(ph, 'receipt_hash', 'receiptHash') ?? pick(th, 'receipt_hash', 'receiptHash', 'hash')
     ?? (typeof telegraphHeader === 'string' ? telegraphHeader : undefined)
     ?? pick(b, 'receipt_hash', 'receiptHash')
     ?? pick((b?.receipt as Record<string, unknown>) ?? null, 'receipt_hash', 'receiptHash', 'hash');
