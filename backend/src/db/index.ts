@@ -63,7 +63,7 @@ export async function getCheck(id: string): Promise<CheckResult | null> {
 /** Newest non-cached check for the same input within the cache TTL. */
 export async function findCachedCheck(kind: string, input: string): Promise<CheckResult | null> {
   const rows = (await sql().query(
-    `select result from checks where kind=$1 and input_norm=$2 and cached=false and result is not null
+    `select result from checks where kind=$1 and input_norm=$2 and cached=false and total_cost_usd > 0 and result is not null
        and created_at > now() - ($3 || ' hours')::interval order by created_at desc limit 1`,
     [kind, normInput(input), String(config.cacheTtlHours)],
   )) as any[];
