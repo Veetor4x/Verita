@@ -123,7 +123,7 @@ export function linkVerdict(miners: Signal[], facts: LinkFacts = {}): { verdict:
     why = 'We could not get a usable answer from any source.';
   } else if (usable.length >= 3 ? flagged * 2 > usable.length : flagged >= 2) {
     verdict = 'SCAM';
-    why = brand && minerFlags > 0 ? 'A source we paid also flagged it as malicious.' : 'Most independent sources flagged this link as malicious.';
+    why = 'Most independent sources flagged this link as malicious.';
   } else if (flagged > 0) {
     verdict = 'CAREFUL';
     why = clean > 0 ? 'The sources disagree, so be careful.' : 'Nothing else could confirm or rule it out.';
@@ -142,7 +142,10 @@ export function linkVerdict(miners: Signal[], facts: LinkFacts = {}): { verdict:
   const reasons: string[] = [];
   if (brand) reasons.push(`Pretends to be ${brand.brand}, but isn't the official site (${brand.officialDomain}).`);
   // A brand-only flag with no paid evidence: the brand line already says it, skip the vague sentence.
-  if (!(brand && minerFlags === 0 && verdict === 'CAREFUL' && clean === 0)) reasons.push(why);
+  // Skip the sentence when it would only repeat the other lines: a brand-only flag (the brand line says it), or
+  // brand + a paid flag (the brand line and the "N checks bought: 1 flagged it" line already say both).
+  const repeats = brand && ((minerFlags === 0 && verdict === 'CAREFUL' && clean === 0) || (minerFlags > 0 && verdict === 'SCAM'));
+  if (!repeats) reasons.push(why);
   reasons.push(bought);
   if (young) reasons.push(`The domain is only ${facts.domainAgeDays} days old.`);
   return { verdict, reasons: reasons.slice(0, 3) };

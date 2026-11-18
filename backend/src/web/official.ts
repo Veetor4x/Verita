@@ -3,6 +3,7 @@ import type { CheckResult } from '../../../shared/types.js';
 
 /** A safe https URL for the official site, or null. Only plain hostnames are accepted (no paths, no odd schemes). */
 export function officialUrl(r: CheckResult): string | null {
+  if (r.kind !== 'LINK') return null; // claims keep source links in officialCheck.links: those are not an "official site"
   const oc = r.officialCheck;
   if (oc.status !== 'CLOSE' && oc.status !== 'FOUND') return null;
   const raw = oc.officialSite ?? oc.links[0];

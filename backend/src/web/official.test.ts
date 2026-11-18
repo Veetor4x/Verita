@@ -16,3 +16,9 @@ test('junk values are rejected', () => {
   assert.equal(officialUrl(base({ status: 'CLOSE', links: [], officialSite: '"><script>' })), null);
   assert.equal(officialUrl(base({ status: 'CLOSE', links: [] })), null);
 });
+
+test('only links get an Official site button (claims store credible source links in officialCheck.links)', () => {
+  const claim = { ...base({ status: 'FOUND', links: ['https://www.bbc.com/news/x'] }), kind: 'CLAIM' as const };
+  assert.equal(officialUrl(claim), null);
+  assert.equal(officialUrl({ ...claim, kind: 'PAYMENT' }), null);
+});

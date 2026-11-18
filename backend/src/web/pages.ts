@@ -1,11 +1,11 @@
 // Server-rendered HTML, no build step. Mobile-first. Everything user-controlled goes through esc().
 import type { CheckResult } from '../../../shared/types.js';
-import { esc } from '../bot/format.js';
+import { esc, titleOf } from '../bot/format.js';
+import { CLAIM_OFFICIAL_TEXT } from '../engine/claims.js';
 import { config } from '../config.js';
 import { officialUrl } from './official.js';
 import type { Stats } from '../db/index.js';
 
-const TITLE = { SAFE: '🟢 Looks safe', CAREFUL: '🟡 Be careful', SCAM: '🔴 Likely scam' } as const;
 const CLASS = { SAFE: 'safe', CAREFUL: 'careful', SCAM: 'scam' } as const;
 const DISCLAIMER = '⚠️ Always confirm on official channels before acting.';
 
@@ -30,12 +30,28 @@ function verifyLink(hash: string): string {
 
 export function resultPage(r: CheckResult): string {
   const v = CLASS[r.verdict];
+  const title = titleOf(r);
   const official = officialUrl(r);
+  const bought = r.details.receipts.length;
   const rounds = Math.max(0, ...r.details.receipts.map((x) => x.round));
-  const officialNote = r.officialCheck.status === 'CLOSE'
+
+  // What was checked: a link/hash in a chip, a claim as a quote.
+  const subject = r.kind === 'CLAIM' ? `<blockquote class="claim">${esc(r.input)}</blockquote>` : `<p class="url">${esc(r.input)}</p>`;
+
+  const officialNote = r.kind !== 'LINK' ? '' : r.officialCheck.status === 'CLOSE'
     ? `<p class="note">This address looks like a copy of a known brand. The real site is <strong>${esc(r.officialCheck.officialSite ?? '')}</strong>.</p>`
     : r.officialCheck.status === 'FOUND'
       ? `<p class="note">This is the official site: <strong>${esc(r.officialCheck.officialSite ?? '')}</strong>.</p>` : '';
+
+  // Payments: label/value lines.
+  const facts = r.details.facts?.length
+    ? `<dl class="facts">${r.details.facts.map((f) => `<dt>${esc(f.label)}</dt><dd>${esc(f.value)}</dd>`).join('')}</dl>` : '';
+
+  // Claims: Official Check line + up to 3 real source links returned by the miners.
+  const links = (r.details.sourceLinks ?? []).slice(0, 3);
+  const claimExtra = r.kind !== 'CLAIM' ? '' : `
+  <p class="note"><strong>Official check:</strong> ${CLAIM_OFFICIAL_TEXT[r.officialCheck.status]}</p>
+  ${links.length ? `<p class="lbl">Sources</p><ul class="srcs">${links.map((u) => `<li><a href="${esc(u)}" rel="noopener noreferrer" target="_blank">${esc(u)}</a></li>`).join('')}</ul>` : ''}`;
 
   const receipts = r.details.receipts.map((x) => `
 <article class="rc">
@@ -45,26 +61,30 @@ export function resultPage(r: CheckResult): string {
   ${x.receiptHash ? `<p class="lbl">receipt_hash</p><code>${esc(x.receiptHash)}</code>` : ''}
 </article>`).join('');
 
+  const escalationNote = rounds > 1
+    ? `<p class="note">${r.kind === 'PAYMENT' ? 'It looked risky, so the agent also bought a risk screen.' : 'The first answers were not clear, so the agent decided to buy more from other miners.'}</p>` : '';
+
   const body = `
 <section class="card ${v}" aria-labelledby="verdict">
-  <h1 id="verdict">${TITLE[r.verdict]}</h1>
-  <p class="url">${esc(r.input)}</p>
+  <h1 id="verdict">${title}</h1>
+  ${subject}
+  ${facts}
   <ul class="reasons">${r.reasons.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
-  ${officialNote}
+  ${officialNote}${claimExtra}
   ${official ? `<a class="btn" href="${esc(official)}" rel="noopener noreferrer" target="_blank">Official site</a>` : ''}
 </section>
 
 <details class="more" open>
   <summary>More details</summary>
   <p class="sum">Cost <strong>$${r.details.totalCostUsd.toFixed(2)}</strong>${r.details.cached ? ' (cache hit)' : ''} ·
-    <strong>${r.details.receipts.length}</strong> check${r.details.receipts.length === 1 ? '' : 's'} bought ·
-    <strong>${rounds || 0}</strong> round${rounds === 1 ? '' : 's'}</p>
-  ${rounds > 1 ? '<p class="note">The first answers were not clear, so the agent decided to buy more from other miners.</p>' : ''}
+    <strong>${bought}</strong> check${bought === 1 ? '' : 's'} bought ·
+    <strong>${rounds}</strong> round${rounds === 1 ? '' : 's'}</p>
+  ${escalationNote}
   ${r.details.sources.length ? `<p class="meta">Also used: ${r.details.sources.map(esc).join('; ')}.</p>` : ''}
   <p class="meta">Miners: ${esc(r.details.miners.join(', ') || '-')}. Tap a signal_hash to verify it on Telegraph.</p>
-  ${receipts || '<p class="meta">No paid checks were made for this result.</p>'}
+  ${receipts || '<p class="meta">Nothing was bought for this result: it was read straight from the network.</p>'}
 </details>`;
-  return page(`Verità – ${TITLE[r.verdict]}`, body, `${TITLE[r.verdict]}: ${r.input.slice(0, 120)}`);
+  return page(`Verità – ${title}`, body, `${title}: ${r.input.slice(0, 120)}`);
 }
 
 export function statsPage(s: Stats): string {

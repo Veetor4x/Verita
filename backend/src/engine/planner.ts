@@ -9,7 +9,7 @@ import type { Receipt } from '../../../shared/types.js';
 const PRICE_USD = 0.01; // devnode price per ask; real price = min_price_usdc from discovery
 
 export type Plan = { intent: string; params: Record<string, unknown> };
-export type Purchase = { receipt: Receipt; signal: Signal; ok: boolean; error?: string };
+export type Purchase = { receipt: Receipt; signal: Signal; ok: boolean; error?: string; data?: any };
 
 export class SpendTracker {
   spent = 0;
@@ -18,14 +18,15 @@ export class SpendTracker {
   canAfford(usd: number) { return this.spent + usd <= this.perCheck + 1e-9 && this.spentToday + this.spent + usd <= this.perDay + 1e-9; }
 }
 
-async function buy(checkId: string, plan: Plan, round: 1 | 2, tracker: SpendTracker, minerId?: string): Promise<Purchase | null> {
+/** Buy one answer (escrow first), enforce the spend caps, save the receipt. Returns null when over budget. */
+export async function buy(checkId: string, plan: Plan, round: 1 | 2, tracker: SpendTracker, minerId?: string, rawBody?: unknown): Promise<Purchase | null> {
   if (!tracker.canAfford(PRICE_USD)) return null; // hard cap: never buy over budget
-  const r: AskResult = await ask({ intent: plan.intent, params: plan.params, minerId, expectedPriceUsd: PRICE_USD });
+  const r: AskResult = await ask({ intent: plan.intent, params: plan.params, minerId, expectedPriceUsd: PRICE_USD, rawBody });
   tracker.spent += r.costUsd;
   const signal = toSignal(plan.intent, r.minerId, r.data, r.fieldStatus);
   await savePurchase({ checkId, intent: plan.intent, minerId: r.minerId, costUsd: r.costUsd, signalHash: r.signalHash, receiptHash: r.receiptHash, txHash: r.txHash, fieldStatus: r.fieldStatus, response: r.data, round });
   const receipt: Receipt = { intent: plan.intent, minerId: r.minerId ?? 'routed', costUsd: r.costUsd, signalHash: r.signalHash ?? '', receiptHash: r.receiptHash, round };
-  return { receipt, signal, ok: r.ok, error: r.error };
+  return { receipt, signal, ok: r.ok, error: r.error, data: r.data };
 }
 
 /**
