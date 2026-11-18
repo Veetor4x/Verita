@@ -1,0 +1,5 @@
+body{font:16px/1.5 system-ui,sans-serif;margin:0;background:#fafafa;color:#111}
+main{max-width:720px;margin:0 auto;padding:16px}
+.in{word-break:break-all;background:#eee;padding:8px;border-radius:6px}
+.scroll{overflow-x:auto}table{border-collapse:collapse;font-size:12px}td,th{border:1px solid #ddd;padding:4px 6px;text-align:left}
+code{word-break:break-all}.warn{font-weight:600}

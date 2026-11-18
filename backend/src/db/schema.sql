@@ -28,3 +28,5 @@ create table if not exists purchases (
 );
 create index if not exists purchases_check_idx on purchases (check_id);
 create index if not exists purchases_day_idx on purchases (created_at);
+
+alter table checks add column if not exists result jsonb;
