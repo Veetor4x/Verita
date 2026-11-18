@@ -37,11 +37,51 @@ async function leaderboard(): Promise<Record<string, any[]>> {
   return boardCache.intents;
 }
 
+/**
+ * The current epoch's board starts almost empty after every epoch change (epoch 13 had 6 intents), so when it has
+ * nothing for this intent we fall back to each miner's own latest score for it (/api/miners?intent=X -> scores[]).
+ * Newest scored epoch first, then best score.
+ */
+const apiCache = new Map<string, { at: number; rows: any[] }>();
+/** Full miner entries for an intent (endpoints, scores...), cached 5 minutes. */
+async function apiMiners(intent: string): Promise<any[]> {
+  const hit = apiCache.get(intent);
+  if (hit && Date.now() - hit.at < 5 * 60_000) return hit.rows;
+  const rows = (await getJson(`/api/miners?intent=${encodeURIComponent(intent)}`)) as any[];
+  apiCache.set(intent, { at: Date.now(), rows });
+  return rows;
+}
+
+/** Ids of miners that expose `GET {path}` (e.g. the richer "/check-tx" lookup). Found by capability, never hardcoded. */
+export async function minersWithEndpoint(intent: string, path: string): Promise<Set<string>> {
+  try {
+    return new Set((await apiMiners(intent)).filter((m) => (m.endpoints ?? []).some((e: any) => e.path === path && String(e.method).toUpperCase() === 'GET')).map((m) => String(m.id)));
+  } catch { return new Set(); }
+}
+
+const scoreCache = new Map<string, { at: number; rows: Ranked[] }>();
+async function scoresFor(intent: string): Promise<Ranked[]> {
+  const hit = scoreCache.get(intent);
+  if (hit && Date.now() - hit.at < 5 * 60_000) return hit.rows;
+  const miners = await apiMiners(intent);
+  const rows: (Ranked & { epoch: number })[] = [];
+  for (const m of miners) {
+    if (m.activation_status && m.activation_status !== 'active') continue;
+    const mine = (m.scores ?? []).filter((s: any) => s.intent_id === intent).sort((a: any, b: any) => b.epoch_id - a.epoch_id)[0];
+    if (mine) rows.push({ slug: String(m.slug), rank: 0, score: Number(mine.score), epoch: Number(mine.epoch_id) });
+  }
+  const newest = Math.max(0, ...rows.map((r) => r.epoch));
+  const ranked = rows.filter((r) => r.epoch >= newest - 3).sort((a, b) => b.score - a.score || a.slug.localeCompare(b.slug)).map((r, i) => ({ slug: r.slug, score: r.score, rank: i + 1 }));
+  scoreCache.set(intent, { at: Date.now(), rows: ranked });
+  return ranked;
+}
+
 async function rankingFor(intent: string): Promise<Ranked[]> {
   try {
     const rows = ((await leaderboard())[intent] ?? []).filter((r: any) => r.activation_status === 'active');
-    return rows.map((r: any) => ({ slug: String(r.miner_slug), rank: Number(r.rank), score: Number(r.score) })).sort((a: Ranked, b: Ranked) => a.rank - b.rank);
-  } catch { return []; }
+    if (rows.length > 0) return rows.map((r: any) => ({ slug: String(r.miner_slug), rank: Number(r.rank), score: Number(r.score) })).sort((a: Ranked, b: Ranked) => a.rank - b.rank);
+  } catch { /* fall through to the per-miner scores */ }
+  try { return await scoresFor(intent); } catch { return []; }
 }
 
 /**

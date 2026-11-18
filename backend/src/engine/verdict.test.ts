@@ -115,3 +115,14 @@ test('brand-only flag: brand line + bought line, no vague sentence', () => {
   assert.equal(r.verdict, 'CAREFUL');
   assert.deepEqual(r.reasons, ["Pretends to be PayPal, but isn't the official site (paypal.com).", "2 checks bought: 2 couldn't check this link."]);
 });
+
+test('brand + a paid flag: no repeated sentence, the bought line says how many flagged it', () => {
+  const sigs = [m('4433', true), m('302', false), m('731006', null), m('7334', null)];
+  const r = linkVerdict(sigs, { brandImpersonation: brand });
+  assert.equal(r.verdict, 'SCAM');
+  assert.deepEqual(r.reasons, [
+    "Pretends to be PayPal, but isn't the official site (paypal.com).",
+    "4 checks bought: 1 flagged it, 1 found no threat, 2 couldn't check this link.",
+  ]);
+  assert.ok(r.reasons.every((x) => !/also flagged/.test(x)));
+});

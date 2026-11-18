@@ -90,9 +90,10 @@ async function post(url: string, body: string, extra: Record<string, string> = {
  * Buy one answer. With minerId we call /ask/{minerId}; otherwise Telegraph routes.
  * expectedPriceUsd is only a fallback for our spend accounting; the answer's cost_usd wins.
  */
-export async function ask(opts: { intent: string; params: Record<string, unknown>; minerId?: string; expectedPriceUsd?: number }): Promise<AskResult> {
+export async function ask(opts: { intent: string; params: Record<string, unknown>; minerId?: string; expectedPriceUsd?: number; rawBody?: unknown }): Promise<AskResult> {
   const url = config.telegraphBaseUrl + (opts.minerId ? `/engine/v1/ask/${encodeURIComponent(opts.minerId)}` : '/engine/v1/ask');
-  const body = JSON.stringify({ intent: opts.intent, params: opts.params });
+  // rawBody: native {method, endpoint, payload} body for /ask/{minerId}, for miners the router cannot map.
+  const body = JSON.stringify(opts.rawBody ?? { intent: opts.intent, params: opts.params });
   const mode = config.paymentMode;
   let raw: Raw | null = null;
   let rail: AskResult['rail'] = 'none';

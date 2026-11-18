@@ -47,6 +47,9 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 - ✅ Cache cutoff `config.cacheValidFrom`: bump it whenever verdict rules change so old cached verdicts are ignored
 - ✅ Honest counts (Nov 18): reasons end with "N checks bought: X flagged it, Y found no threat, Z couldn't check this link." built from the purchases (never "1 of 2 sources" when 4 were bought); brand check is listed separately and never counted as bought
 - ✅ Wallet: minted +20 test USDC (wallet 21.75 USDC); `setup-wallet.mjs <amount>` always mints that amount
+- ✅ Link polish: brand + paid flag no longer repeats "a source we paid also flagged it" (the "N checks bought" line says it)
+- ✅ Ranking fix: when the current epoch's leaderboard has no row for an intent (it is nearly empty right after an epoch change), fall back to each miner's own latest score from `/api/miners?intent=X`. Unscored "do-everything" miners (a1-preflight, chainsight) sort last
+- ✅ Bot routing is unit-tested with fake Telegram updates (`src/bot/routing.test.ts`): normal group chat is never checked
 
 ## Nov 19 — Bot + deploy
 - ✅ Telegram bot, DM mode (webhook, secret check) — tested locally with simulated updates
@@ -57,9 +60,9 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 - ⬜ Demo: scam link posted in a group → automatic 🔴 + receipts
 
 ## Nov 21–23 — More checks
-- ⬜ Claim check (fact-check + sources)
-- ⬜ Payment check (tx hash/address → network, wallet vs contract, USD amount)
-- 🔄 Official Check (FOUND / CLOSE / NOT_FOUND): brand-list part done for links and shown as an "Official site" button in the bot reply and on `/c/:id`; still todo: web-search part (WEB_SEARCH_GENERAL, VENDOR_VERIFY_GENERAL)
+- ✅ Claim check (Nov 18): DM = any message with no link/tx/address; group = only when replying with `/check`. R1 FACT_CHECK + NEWS_SEARCH (routed), R2 WEB_SEARCH + CONTENT_VERIFICATION from top-ranked miners. 🟢 true / 🟡 unverified or mixed / 🔴 false, max 3 reasons, up to 3 real source links (relevance-filtered), Official line. Results in docs/CLAIM_TESTS.md. **Known limit: with today's miners almost every claim ends 🟡; true claims never reached 🟢**
+- ✅ Payment check, basic (Nov 18): tx hash or address → network, from → to, wallet vs contract (🟡 if contract), amount + USD, status. Free RPC for network/contract + paid lookup/price/(risk). Results in docs/PAYMENT_TESTS.md. **Known limits: mainnet RPC untested live (blocked in the build sandbox); scam-tagged wallets are not detected**
+- 🔄 Official Check (FOUND / CLOSE / NOT_FOUND): links = brand list + "Official site" button (done); claims = "Found on official/credible sources" / "Something close found" / "Not found" (done, source links must relate to the claim); still todo: web-search part for links (WEB_SEARCH_GENERAL, VENDOR_VERIFY_GENERAL)
 - ⬜ Cache (24h per normalised input) and spend caps (per check + per day)
 
 ## Nov 24–25 — Web pages
