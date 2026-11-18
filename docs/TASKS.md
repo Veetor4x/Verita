@@ -44,9 +44,9 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 - ✅ Link check engine: planner with escalation (Round 1 → Round 2) + deterministic verdict (verified live on a known-bad link)
 
 ## Nov 19 — Bot + deploy
-- ⬜ Telegram bot, DM mode (webhook, secret check)
-- ⬜ Group guard (auto-check links; BotFather `/setprivacy` → Disable)
-- ⬜ Deploy to Render, set webhook, UptimeRobot ping on `/health`
+- ✅ Telegram bot, DM mode (webhook, secret check) — tested locally with simulated updates
+- ✅ Group guard code done; BotFather privacy disabled (needs a live test in a real group)
+- 🔄 Deploy to Render: service `verita` created (https://verita-znay.onrender.com), build OK; waiting for secrets DATABASE_URL, EVM_PRIVATE_KEY, TELEGRAM_BOT_TOKEN in the Render dashboard; then confirm setWebhook + /health. UptimeRobot still todo
 
 ## Nov 20 — SHOWCASE
 - ⬜ Demo: scam link posted in a group → automatic 🔴 + receipts
