@@ -70,3 +70,12 @@ test('miner flagged if any of its answers flagged', () => {
   assert.equal(onePerMiner([m('1', false), m('1', true)])[0].flagged, true);
   assert.equal(onePerMiner([m('1', null), m('1', false)])[0].flagged, false);
 });
+
+test('unknown is not safe: a lone "ok" answer -> CAREFUL, not SAFE', () => {
+  assert.equal(linkVerdict([m('302', false), m('7334', null), m('731006', null)]).verdict, 'CAREFUL');
+  assert.equal(linkVerdict([m('302', false), m('302', false)]).verdict, 'CAREFUL'); // same miner twice = 1 source
+  assert.equal(linkVerdict([m('302', false), m('7334', false)]).verdict, 'SAFE');
+});
+test('popular domain stays SAFE even with a lone answer', () => {
+  assert.equal(linkVerdict([m('302', false), m('302', false)], { popular: true }).verdict, 'SAFE');
+});

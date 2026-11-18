@@ -7,11 +7,11 @@ import { isPopularDomain } from '../popular-domains.js';
 export async function checkLink(url: string): Promise<CheckResult> {
   const id = randomUUID().slice(0, 8);
   const tracker = await SpendTracker.create();
+  const popular = isPopularDomain(url);
   const { purchases } = await runPlan(id, [
     { intent: 'URL_SCAN_VERDICT', params: { url } },
     { intent: 'THREAT_INTELLIGENCE_INDICATOR', params: { indicator: url } },
-  ], tracker);
-  const popular = isPopularDomain(url);
+  ], tracker, { popular });
   const { verdict, reasons } = linkVerdict(purchases.map((p) => p.signal), { popular });
   return {
     id, kind: 'LINK', input: url, verdict, reasons,

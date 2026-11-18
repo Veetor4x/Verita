@@ -65,6 +65,7 @@ export function signalsAgree(all: Signal[]): boolean {
  *
  * - Popular domain (bundled top-sites list): 🟢 unless 2+ sources flag it. Never 🟡 just because one miner disagrees.
  * - 2 usable answers (Round 1): both flag -> 🔴, one flags -> 🟡, none -> 🟢.
+ * - Fewer than 2 independent usable answers and nobody flagged: 🟡 (unknown is not safe).
  * - 3+ usable answers (agent escalated): MAJORITY vote across ALL sources.
  *     more than half flag -> 🔴 | nobody flags -> 🟢 | anything in between (incl. ties) -> 🟡.
  */
@@ -97,13 +98,16 @@ export function linkVerdict(all: Signal[], facts: LinkFacts = {}): { verdict: Ve
     reasons.push(clean === 0
       ? `${flagged} source flagged this link, and no other source could confirm or deny it.`
       : `${flagged} of ${usable.length} sources flagged this link, while ${clean} did not. Sources disagree.`);
+  } else if (usable.length < 2) {
+    // Unknown is not safe: one lone "ok" (the others could not verify the link) is not enough for 🟢.
+    verdict = 'CAREFUL';
+    reasons.push(`Only ${usable.length} source could check this link and it found no threat, so we cannot call it safe.`);
   } else if (young) {
     verdict = 'CAREFUL';
   } else {
     verdict = 'SAFE';
-    reasons.push(`${clean} source${clean > 1 ? 's' : ''} found no threat.`);
+    reasons.push(`${clean} sources found no threat.`);
   }
   if (young) reasons.push(`The domain is only ${facts.domainAgeDays} days old.`);
-  if (verdict === 'SAFE' && usable.length < 2) reasons.push('Only one source answered, so confidence is limited.');
   return { verdict, reasons: reasons.slice(0, 3) };
 }
