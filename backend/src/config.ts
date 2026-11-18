@@ -8,6 +8,9 @@ export const config = {
   maxSpendPerCheckUsd: num(process.env.MAX_SPEND_PER_CHECK_USD, 0.1),
   maxSpendPerDayUsd: num(process.env.MAX_SPEND_PER_DAY_USD, 3.0),
   cacheTtlHours: num(process.env.CACHE_TTL_HOURS, 24),
+  publicUrl: (process.env.PUBLIC_URL || '').replace(/\/$/, ''),
+  telegramToken: process.env.TELEGRAM_BOT_TOKEN || '',
+  webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || '',
   port: num(process.env.PORT, 3000),
   // auto = escrow first, x402 fallback. Or force 'escrow' / 'x402'.
   paymentMode: (['escrow', 'x402'].includes(process.env.PAYMENT_MODE || '') ? process.env.PAYMENT_MODE : 'auto') as 'auto' | 'escrow' | 'x402',
