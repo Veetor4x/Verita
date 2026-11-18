@@ -45,3 +45,4 @@ export function isPopularDomain(urlOrHost: string): boolean {
 }
 
 export const POPULAR_COUNT = SET.size;
+export const POPULAR_LIST = [...SET];

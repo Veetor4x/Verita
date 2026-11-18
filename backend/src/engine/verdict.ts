@@ -9,7 +9,12 @@ export type Signal = {
   note?: string;
 };
 
-export type LinkFacts = { domainAgeDays?: number | null; popular?: boolean };
+export type LinkFacts = {
+  domainAgeDays?: number | null;
+  popular?: boolean;
+  /** Set when the domain pretends to be a known brand (see brands.ts). Counts as ONE flag. */
+  brandImpersonation?: { brand: string; officialDomain: string };
+};
 
 export const DISCLAIMER = '⚠️ Always confirm on official channels before acting.';
 
@@ -69,7 +74,10 @@ export function signalsAgree(all: Signal[]): boolean {
  * - 3+ usable answers (agent escalated): MAJORITY vote across ALL sources.
  *     more than half flag -> 🔴 | nobody flags -> 🟢 | anything in between (incl. ties) -> 🟡.
  */
-export function linkVerdict(all: Signal[], facts: LinkFacts = {}): { verdict: Verdict; reasons: string[] } {
+export function linkVerdict(miners: Signal[], facts: LinkFacts = {}): { verdict: Verdict; reasons: string[] } {
+  const brand = facts.brandImpersonation;
+  // The brand check is one more (free, deterministic) source that says "bad".
+  const all: Signal[] = brand ? [...miners, { intent: 'BRAND_IMPERSONATION', minerId: 'verita:brand-check', flagged: true }] : miners;
   const usable = onePerMiner(all).filter((s) => s.flagged !== null);
   const flagged = usable.filter((s) => s.flagged === true).length;
   const clean = usable.length - flagged;
@@ -109,5 +117,13 @@ export function linkVerdict(all: Signal[], facts: LinkFacts = {}): { verdict: Ve
     reasons.push(`${clean} sources found no threat.`);
   }
   if (young) reasons.push(`The domain is only ${facts.domainAgeDays} days old.`);
-  return { verdict, reasons: reasons.slice(0, 3) };
+  return { verdict, reasons: withBrandReason(reasons, brand, flagged, clean) };
+}
+
+/** Brand reason goes first (worst first). If the brand check is the ONLY flag, drop the vague "1 source flagged" line. */
+function withBrandReason(reasons: string[], brand: LinkFacts['brandImpersonation'], flagged: number, clean: number): string[] {
+  if (!brand) return reasons.slice(0, 3);
+  const line = `Pretends to be ${brand.brand}, but isn't the official site (${brand.officialDomain}).`;
+  const rest = flagged === 1 && clean === 0 ? reasons.filter((r) => !/no other source could confirm/.test(r)) : reasons;
+  return [line, ...rest].slice(0, 3);
 }

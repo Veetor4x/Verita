@@ -64,8 +64,8 @@ export async function getCheck(id: string): Promise<CheckResult | null> {
 export async function findCachedCheck(kind: string, input: string): Promise<CheckResult | null> {
   const rows = (await sql().query(
     `select result from checks where kind=$1 and input_norm=$2 and cached=false and total_cost_usd > 0 and result is not null
-       and created_at > now() - ($3 || ' hours')::interval order by created_at desc limit 1`,
-    [kind, normInput(input), String(config.cacheTtlHours)],
+       and created_at > now() - ($3 || ' hours')::interval and created_at > $4::timestamptz order by created_at desc limit 1`,
+    [kind, normInput(input), String(config.cacheTtlHours), config.cacheValidFrom],
   )) as any[];
   return rows[0]?.result ?? null;
 }

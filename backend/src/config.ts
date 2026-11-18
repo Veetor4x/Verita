@@ -7,6 +7,8 @@ export const config = {
   evmPrivateKey: process.env.EVM_PRIVATE_KEY || '',
   maxSpendPerCheckUsd: num(process.env.MAX_SPEND_PER_CHECK_USD, 0.1),
   maxSpendPerDayUsd: num(process.env.MAX_SPEND_PER_DAY_USD, 3.0),
+  // Bump this date whenever verdict rules change: older cached verdicts are ignored (they used the old rules).
+  cacheValidFrom: '2026-11-18T19:31:00Z',
   cacheTtlHours: num(process.env.CACHE_TTL_HOURS, 24),
   publicUrl: (process.env.PUBLIC_URL || '').replace(/\/$/, ''),
   telegramToken: process.env.TELEGRAM_BOT_TOKEN || '',

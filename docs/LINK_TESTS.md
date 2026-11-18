@@ -10,6 +10,8 @@ R1 = bought 2 signals, R2 = the agent escalated and bought 2 more miners.
 - **Unknown is not safe**: fewer than 2 independent usable answers and nobody flagged → 🟡 (miners answer `safe: null` for domains they cannot resolve).
 - **Round 2 miners** are picked by Telegraph's leaderboard rank (`/leaderboard/miners`), not by the order of `/intents/{X}` (that order is shuffled on every call), so the same inputs buy the same miners.
 
+- **Brand impersonation** (`src/engine/brands.ts`): a host containing a known brand (metamask, binance, paypal/paypa1, uniswap, coinbase, opay, ~30 more) that is not one of its official domains counts as ONE flag, reason "Pretends to be <Brand>, but isn't the official site (<domain>)". Alone → 🟡. Plus any miner flag → 🔴 (majority). Official domains and their subdomains are never flagged.
+
 ## Results
 
 ### Baseline, old rules (earlier today, from the previous version of this doc)
@@ -47,11 +49,23 @@ Why it still flipped: Round 2 miners were effectively random (the miner list in 
 
 Net effect: known-good sites are 🟢 in every run since the popular list (google.com no longer flips). Unstable scam-looking links: 4 of 5 in the baseline and Run A → 1 of 5 in Run B → the last flip (a lone "ok" answer turning 🟢) is closed by the "unknown is not safe" rule, but Run C is a single run per link, so treat it as a spot check, not proof of stability.
 
+### Run D, + brand-impersonation signal (3 runs each for scam-style links, 1 run for the rest; ~$0.56)
+| URL | Runs |
+|---|---|
+| metamask-wallet-verify.xyz/connect | 🔴R2 🔴R2 🔴R2 stable |
+| binance-airdrop-claim.top | 🔴R2 🔴R2 🔴R2 stable |
+| paypa1-secure-login.verify-account.xyz/signin | 🔴R2 🔴R2 🔴R2 stable |
+| uniswap-claim-reward.xyz | 🟡R2 🟡R2 🟡R2 stable (brand flag only: no miner flags this link, so it stays 🟡) |
+| malware.wicar.org/... | 🔴R1 |
+| google.com, github.com | 🟢R1 each |
+| paypal.com (the real one) | 🟢R1 (official domain, no flag) |
+
+Net: all four scam-style links are now stable; three reach 🔴 with the specific "Pretends to be ..." reason first. The 🔴 for those three depends on at least one miner flagging them (miner 4433 and others do for these names); if no miner flags a pretender link it stays 🟡 by design.
+
 ## Demo links
 - **Reliable 🔴, no escalation, ~$0.02:** `http://malware.wicar.org/data/ms14_064_ole_notxp.html` (8/8 earlier, then 3/3 in both Run A and Run B).
-- **Visible escalation (Round 2):** `http://metamask-wallet-verify.xyz/connect`, `http://binance-airdrop-claim.top/` → stable 🟡 with R2.
-  Note: these pattern-style domains are not in any threat feed and most miners cannot resolve them, so they end at 🟡, not 🔴. Only the WICAR link is a confirmed 🔴.
-- **Escalation to 🔴:** none reliable yet. Find a real, live phishing URL (OpenPhish/PhishTank feeds) on the day of the demo and test it once.
+- **Visible escalation to 🔴 (Round 2, ~$0.04):** `http://metamask-wallet-verify.xyz/connect`, `http://binance-airdrop-claim.top/`, `http://paypa1-secure-login.verify-account.xyz/signin` → stable 🔴R2 with "Pretends to be ..." as reason 1.
+  Caveat: these made-up domains are not in any threat feed; the 🔴 comes from the brand check plus one miner. A real live phishing URL (OpenPhish/PhishTank) is still worth testing once on demo day.
 
 ## Weak spots (miners do NOT flag these)
 - Google Safe Browsing test pages (`testsafebrowsing.appspot.com/s/*`): 🟡 or 🟢. Don't use for the demo. (Not re-run in B/C.)
