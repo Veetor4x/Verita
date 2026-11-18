@@ -4,6 +4,7 @@ import { extractLinks } from '../engine/extract.js';
 import { runLinkCheck } from '../engine/run.js';
 import { formatResult } from './format.js';
 import { config } from '../config.js';
+import { officialUrl } from '../web/official.js';
 
 const WELCOME =
   '<b>Verità</b> checks if a link is legit before you click.\n\n' +
@@ -41,8 +42,13 @@ export function createBot(token: string) {
     for (const url of links) {
       try {
         const r = await runLinkCheck(url);
-        const kb = config.publicUrl ? new InlineKeyboard().url('More details', `${config.publicUrl}/c/${r.id}`) : undefined;
-        await ctx.reply(formatResult(r), { ...opts, ...(kb ? { reply_markup: kb } : {}) });
+        // Buttons: "More details" (result page) and, when the Official Check found the real site, "Official site".
+        const kb = new InlineKeyboard();
+        if (config.publicUrl) kb.url('More details', `${config.publicUrl}/c/${r.id}`);
+        const official = officialUrl(r);
+        if (official) kb.url('Official site', official);
+        const hasButtons = Boolean(config.publicUrl) || Boolean(official);
+        await ctx.reply(formatResult(r), { ...opts, ...(hasButtons ? { reply_markup: kb } : {}) });
       } catch (e) {
         console.error('check failed:', (e as Error).message);
         await ctx.reply('Sorry, I could not check that link right now. Please try again.', opts).catch(() => {});

@@ -45,6 +45,8 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 - ✅ False-alarm fixes (Nov 18): bundled popular-domain list (google.com never 🟡), majority vote after escalation, one vote per miner, Round 2 miners chosen by leaderboard rank, "unknown is not safe" (see docs/LINK_TESTS.md). No reliable 🔴-after-escalation demo link yet: find a live phishing URL from OpenPhish/PhishTank on demo day
 - ✅ Brand-impersonation signal (`src/engine/brands.ts`, start of the Official Check): a host that contains a known brand (metamask, binance, paypal/paypa1, uniswap, coinbase, opay, ~30 brands) but is not one of its official domains counts as ONE flag with the reason "Pretends to be <Brand>, but isn't the official site (<domain>)". Alone → 🟡, plus any miner flag → 🔴. `officialCheck` is FOUND for official domains, CLOSE for impersonation. Official domain lists are hand-written: add any missing official domain to `BRANDS` when it causes a false 🟡
 - ✅ Cache cutoff `config.cacheValidFrom`: bump it whenever verdict rules change so old cached verdicts are ignored
+- ✅ Honest counts (Nov 18): reasons end with "N checks bought: X flagged it, Y found no threat, Z couldn't check this link." built from the purchases (never "1 of 2 sources" when 4 were bought); brand check is listed separately and never counted as bought
+- ✅ Wallet: minted +20 test USDC (wallet 21.75 USDC); `setup-wallet.mjs <amount>` always mints that amount
 
 ## Nov 19 — Bot + deploy
 - ✅ Telegram bot, DM mode (webhook, secret check) — tested locally with simulated updates
@@ -57,12 +59,13 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 ## Nov 21–23 — More checks
 - ⬜ Claim check (fact-check + sources)
 - ⬜ Payment check (tx hash/address → network, wallet vs contract, USD amount)
-- 🔄 Official Check (FOUND / CLOSE / NOT_FOUND): brand-list part done for links; still todo: web-search part (WEB_SEARCH_GENERAL, VENDOR_VERIFY_GENERAL) and showing it on `/c/:id` and in the bot message
+- 🔄 Official Check (FOUND / CLOSE / NOT_FOUND): brand-list part done for links and shown as an "Official site" button in the bot reply and on `/c/:id`; still todo: web-search part (WEB_SEARCH_GENERAL, VENDOR_VERIFY_GENERAL)
 - ⬜ Cache (24h per normalised input) and spend caps (per check + per day)
 
 ## Nov 24–25 — Web pages
 - ⬜ `/` paste box + explainer
-- ⬜ `/c/:id` verdict card + "More details" (miners, cost, receipts)
+- ✅ `/c/:id` verdict card + "More details" (miners, cost, receipts): mobile-first redesign (Nov 18), dark mode, tap-to-verify hashes, "Official site" button
+- ✅ `/stats` public page + `/api/stats`: checks run, USDC spent, receipts, escalated, latest 10 signal hashes (link to Telegraph verify)
 - ⬜ `/api/check`, `/api/check/run`, `/api/check/:id`, rate limiting, input validation
 
 ## Nov 26–27 — Tune

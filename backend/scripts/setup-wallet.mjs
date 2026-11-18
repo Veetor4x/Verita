@@ -1,4 +1,5 @@
 // Shows the burner wallet address + Sepolia balances, and tries to mint test USDC.
+// Usage: node scripts/setup-wallet.mjs [amount]   (amount given = always mint that much)
 // Reads EVM_PRIVATE_KEY from env. NEVER prints the key.
 import { createPublicClient, createWalletClient, http, formatEther, formatUnits, parseUnits } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -37,7 +38,8 @@ if (s.eth === 0n) {
   console.error('\nNo Sepolia ETH. Fund this address from a Sepolia faucet, then re-run.');
   process.exit(2);
 }
-if (s.usdc < parseUnits('1', s.dec)) {
+const explicit = process.argv[2] !== undefined; // `setup-wallet.mjs 20` always mints 20; with no argument it only tops up when below 1 USDC
+if (explicit || s.usdc < parseUnits('1', s.dec)) {
   console.log(`\nTrying to mint ${MINT_AMOUNT} test USDC...`);
   try {
     const hash = await wallet.writeContract({ address: USDC, abi, functionName: 'mint', args: [account.address, parseUnits(MINT_AMOUNT, s.dec)] });

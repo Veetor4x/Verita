@@ -74,56 +74,76 @@ export function signalsAgree(all: Signal[]): boolean {
  * - 3+ usable answers (agent escalated): MAJORITY vote across ALL sources.
  *     more than half flag -> 🔴 | nobody flags -> 🟢 | anything in between (incl. ties) -> 🟡.
  */
+/**
+ * "4 checks bought: 1 flagged it, 1 found no threat, 2 couldn't check this link."
+ * Counts every purchase we made (one line per bought answer), NOT the de-duplicated votes the verdict uses,
+ * so the numbers always match the receipts. The free brand check is never part of it.
+ */
+export function boughtLine(bought: Signal[]): string {
+  const n = bought.length;
+  if (n === 0) return 'No checks could be bought.';
+  const f = bought.filter((s) => s.flagged === true).length;
+  const c = bought.filter((s) => s.flagged === false).length;
+  const u = n - f - c;
+  const parts = [f && `${f} flagged it`, c && `${c} found no threat`, u && `${u} couldn't check this link`].filter(Boolean);
+  return `${n} check${n > 1 ? 's' : ''} bought: ${parts.join(', ')}.`;
+}
+
+/**
+ * Deterministic link verdict. Same signals in -> same verdict out (order does not matter).
+ *
+ * - Popular domain (bundled top-sites list): 🟢 unless 2+ sources flag it. Never 🟡 just because one miner disagrees.
+ * - 2 usable answers (Round 1): both flag -> 🔴, one flags -> 🟡, none -> 🟢.
+ * - 3+ usable answers (agent escalated): MAJORITY vote across ALL sources.
+ *     more than half flag -> 🔴 | nobody flags -> 🟢 | anything in between (incl. ties) -> 🟡.
+ * - Fewer than 2 independent usable answers and nobody flagged: 🟡 (unknown is not safe).
+ * - Brand impersonation (brands.ts) counts as one extra flag.
+ *
+ * Reasons (max 3): brand line first, then one number-free sentence explaining the verdict,
+ * then the "N checks bought: ..." line built from what was actually purchased.
+ */
 export function linkVerdict(miners: Signal[], facts: LinkFacts = {}): { verdict: Verdict; reasons: string[] } {
   const brand = facts.brandImpersonation;
   // The brand check is one more (free, deterministic) source that says "bad".
   const all: Signal[] = brand ? [...miners, { intent: 'BRAND_IMPERSONATION', minerId: 'verita:brand-check', flagged: true }] : miners;
   const usable = onePerMiner(all).filter((s) => s.flagged !== null);
   const flagged = usable.filter((s) => s.flagged === true).length;
-  const clean = usable.length - flagged;
   const young = facts.domainAgeDays != null && facts.domainAgeDays < 30;
-  const reasons: string[] = [];
+  const bought = boughtLine(miners);
+  const minerFlags = miners.filter((s) => s.flagged === true).length;
+  const clean = usable.length - flagged;
   let verdict: Verdict;
+  let why: string;
 
   if (facts.popular && flagged < 2) {
     verdict = 'SAFE';
-    reasons.push('This is a well-known website (on our top-sites list).');
-    if (flagged === 1) reasons.push(`1 source flagged it, but ${clean} did not. Not enough to warn.`);
-    else if (usable.length === 0) reasons.push('No source could be reached, so this rests on the top-sites list alone.');
-    else reasons.push(`${clean} source${clean > 1 ? 's' : ''} found no threat.`);
-    return { verdict, reasons: reasons.slice(0, 3) };
-  }
-
-  const majority = usable.length >= 3;
-  if (usable.length === 0) {
+    why = 'This is a well-known website (on our top-sites list).';
+  } else if (usable.length === 0) {
     verdict = 'CAREFUL';
-    reasons.push('We could not get a usable answer from any source.');
-  } else if (majority ? flagged * 2 > usable.length : flagged >= 2) {
+    why = 'We could not get a usable answer from any source.';
+  } else if (usable.length >= 3 ? flagged * 2 > usable.length : flagged >= 2) {
     verdict = 'SCAM';
-    reasons.push(majority ? `${flagged} of ${usable.length} sources flagged this link as malicious (majority).` : `${flagged} independent sources flagged this link as malicious.`);
+    why = brand && minerFlags > 0 ? 'A source we paid also flagged it as malicious.' : 'Most independent sources flagged this link as malicious.';
   } else if (flagged > 0) {
     verdict = 'CAREFUL';
-    reasons.push(clean === 0
-      ? `${flagged} source flagged this link, and no other source could confirm or deny it.`
-      : `${flagged} of ${usable.length} sources flagged this link, while ${clean} did not. Sources disagree.`);
+    why = clean > 0 ? 'The sources disagree, so be careful.' : 'Nothing else could confirm or rule it out.';
   } else if (usable.length < 2) {
     // Unknown is not safe: one lone "ok" (the others could not verify the link) is not enough for 🟢.
     verdict = 'CAREFUL';
-    reasons.push(`Only ${usable.length} source could check this link and it found no threat, so we cannot call it safe.`);
+    why = 'Too few independent sources could check it, so we cannot call it safe.';
   } else if (young) {
     verdict = 'CAREFUL';
+    why = 'The checks found no threat, but the domain is very new.';
   } else {
     verdict = 'SAFE';
-    reasons.push(`${clean} sources found no threat.`);
+    why = 'Independent sources found no threat.';
   }
-  if (young) reasons.push(`The domain is only ${facts.domainAgeDays} days old.`);
-  return { verdict, reasons: withBrandReason(reasons, brand, flagged, clean) };
-}
 
-/** Brand reason goes first (worst first). If the brand check is the ONLY flag, drop the vague "1 source flagged" line. */
-function withBrandReason(reasons: string[], brand: LinkFacts['brandImpersonation'], flagged: number, clean: number): string[] {
-  if (!brand) return reasons.slice(0, 3);
-  const line = `Pretends to be ${brand.brand}, but isn't the official site (${brand.officialDomain}).`;
-  const rest = flagged === 1 && clean === 0 ? reasons.filter((r) => !/no other source could confirm/.test(r)) : reasons;
-  return [line, ...rest].slice(0, 3);
+  const reasons: string[] = [];
+  if (brand) reasons.push(`Pretends to be ${brand.brand}, but isn't the official site (${brand.officialDomain}).`);
+  // A brand-only flag with no paid evidence: the brand line already says it, skip the vague sentence.
+  if (!(brand && minerFlags === 0 && verdict === 'CAREFUL' && clean === 0)) reasons.push(why);
+  reasons.push(bought);
+  if (young) reasons.push(`The domain is only ${facts.domainAgeDays} days old.`);
+  return { verdict, reasons: reasons.slice(0, 3) };
 }
