@@ -8,7 +8,7 @@
 - `scripts/setup-wallet.mjs` (prints address + balances, mints test USDC, never prints the key).
 - Telegraph client `src/telegraph/client.ts`: **escrow first, x402 per-call fallback** (`PAYMENT_MODE=auto|escrow|x402`). Tested live on escrow: 200, `signal_hash` + `receipt_hash` decoded.
 - `discovery.ts`, `receipts.ts`, Neon layer (`src/db`, `schema.sql`), link engine (`extract`, `planner` with Round 1 → Round 2, `verdict` + 9 passing unit tests), `scripts/check-link.mjs`, `scripts/test-purchase.mjs`.
-- Wallet funded: 0.25 USDC deposited in Telegraph escrow (about 23 calls left at $0.01), about 9.75 USDC in wallet, about 0.055 Sepolia ETH. See `docs/RECEIPTS.md`.
+- Wallet/escrow (Nov 18 evening): escrow topped up to $8.25 deposited (about $5.5 available, 550 calls at $0.01); burner wallet about 1.75 USDC + 0.055 Sepolia ETH left. Render `MAX_SPEND_PER_DAY_USD=10` (set Nov 18). See `docs/RECEIPTS.md`.
 
 **Next (in order)**
 1. New session so `DATABASE_URL` is picked up (it was a placeholder). Test Neon: `NODE_USE_ENV_PROXY=1 npx tsx scripts/_dbcheck.mjs` (recreate it if missing: `migrate()` then list tables).
@@ -43,6 +43,8 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 - ✅ Neon schema (`checks`, `purchases`, `cache`, `spend`)
 - ✅ Link check engine: planner with escalation (Round 1 → Round 2) + deterministic verdict (verified live on a known-bad link)
 - ✅ False-alarm fixes (Nov 18): bundled popular-domain list (google.com never 🟡), majority vote after escalation, one vote per miner, Round 2 miners chosen by leaderboard rank, "unknown is not safe" (see docs/LINK_TESTS.md). No reliable 🔴-after-escalation demo link yet: find a live phishing URL from OpenPhish/PhishTank on demo day
+- ✅ Brand-impersonation signal (`src/engine/brands.ts`, start of the Official Check): a host that contains a known brand (metamask, binance, paypal/paypa1, uniswap, coinbase, opay, ~30 brands) but is not one of its official domains counts as ONE flag with the reason "Pretends to be <Brand>, but isn't the official site (<domain>)". Alone → 🟡, plus any miner flag → 🔴. `officialCheck` is FOUND for official domains, CLOSE for impersonation. Official domain lists are hand-written: add any missing official domain to `BRANDS` when it causes a false 🟡
+- ✅ Cache cutoff `config.cacheValidFrom`: bump it whenever verdict rules change so old cached verdicts are ignored
 
 ## Nov 19 — Bot + deploy
 - ✅ Telegram bot, DM mode (webhook, secret check) — tested locally with simulated updates
@@ -55,7 +57,7 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 ## Nov 21–23 — More checks
 - ⬜ Claim check (fact-check + sources)
 - ⬜ Payment check (tx hash/address → network, wallet vs contract, USD amount)
-- ⬜ Official Check (FOUND / CLOSE / NOT_FOUND)
+- 🔄 Official Check (FOUND / CLOSE / NOT_FOUND): brand-list part done for links; still todo: web-search part (WEB_SEARCH_GENERAL, VENDOR_VERIFY_GENERAL) and showing it on `/c/:id` and in the bot message
 - ⬜ Cache (24h per normalised input) and spend caps (per check + per day)
 
 ## Nov 24–25 — Web pages

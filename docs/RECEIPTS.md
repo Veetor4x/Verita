@@ -33,6 +33,14 @@ Escalation demo, `http://paypa1-secure-login.verify-account.xyz/signin` -> 🔴 
 | 2 | URL_SCAN_VERDICT | 5001 | `0x98ce6ae9783fc6e887202aeb4504cb9d4abc951a21d7c1d0072ff9baa7ea543e` | `0xd9fc553857c15415bdd03106c13a82c806e5cd31ad3273ddc057e190d4ebb87a` |
 | 2 | URL_SCAN_VERDICT | 302 | `0xc7333c3d9c2b5dc0354452e9402c00564bec2f760aa80bc618e8a6d6a74623b9` | `0x71b27125a3000ae36126b787eabfe0d7096a5604a74cfd05fb9f05785b89b922` |
 
+## Escrow top-up #2 (Nov 18 evening, +5 USDC)
+| What | Tx hash |
+|---|---|
+| Approve 5 USDC to the Telegraph diamond | `0xffbf8b474b659924a52718ceb1edefb2134750d6ba748047992274fe50b39b7f` |
+| Escrow deposit 5 USDC (`depositUSDC`) | `0xd2532682c31e8060a310e38fc6aaad7af50404801e760ae6983fb343bac0ca57` |
+
+Escrow after top-up: deposited $8.25 total, about $5.5 available.
+
 ## Ledger snapshot (call 1)
 `GET /v1/ledger/account/{wallet}` → deposited 250000, balance 250000, available 240000, unbilled 10000 (uUSDC).
 
