@@ -39,9 +39,9 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 - ✅ Project skeleton: `backend/` (package `verita-backend`), tsconfig, `.env.example`, `shared/types.ts`
 - ✅ Wallet setup script (`scripts/setup-wallet.mjs`, burner testnet wallet)
 - ✅ Telegraph client: discovery (intents, miners, prices) + paid `/ask` via escrow, x402 fallback, spend controls
-- 🔄 First real paid call: done on escrow (see docs/RECEIPTS.md); saving to Neon pending new session (`scripts/test-purchase.mjs`) + receipt saved in Neon
+- ✅ First real paid call on escrow + receipt saved in Neon (see docs/RECEIPTS.md)
 - ✅ Neon schema (`checks`, `purchases`, `cache`, `spend`)
-- 🔄 Link check engine: planner with escalation (Round 1 → Round 2) + deterministic verdict
+- ✅ Link check engine: planner with escalation (Round 1 → Round 2) + deterministic verdict (verified live on a known-bad link)
 
 ## Nov 19 — Bot + deploy
 - ⬜ Telegram bot, DM mode (webhook, secret check)

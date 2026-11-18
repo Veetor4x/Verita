@@ -20,7 +20,18 @@ Escrow calls are charged to our Telegraph escrow balance and settled per 3-hour 
 
 Call 1 receipt (decoded `X-PAYMENT-RESPONSE`): `rail: escrow`, `amount_uusdc: 10000`, `epoch_id: 8`, `settlement: epoch`, `chain: telegraph`.
 
-Neither call is saved in Neon yet (`DATABASE_URL` was a placeholder in that session). Re-run `scripts/test-purchase.mjs` in the new session to store one.
+## Session 2 (Nov 18): escrow topped up +3 USDC, first receipt saved in Neon
+| # | Intent | Miner | Round | signal_hash | receipt_hash |
+|---|---|---|---|---|---|
+| 3 | URL_SCAN_VERDICT (`https://example.com/`), Neon purchases.id=1 | 731006 | - | `0x6b52ee23227eb2316c12c59eed533c90894bff20c247a54bf214ab911da81285` | `0xdc710a7db54a8c33d9b43becb8c221f655b9a4c500628a40c350f2905b1127dc` |
+
+Escalation demo, `http://paypa1-secure-login.verify-account.xyz/signin` -> 🔴 ($0.04, 2 rounds):
+| Round | Intent | Miner | signal_hash | receipt_hash |
+|---|---|---|---|---|
+| 1 | URL_SCAN_VERDICT | 4433 | `0x99347b93df8d0cd2477c390e7050e164341692a1be4484e608942707b338c9bd` | `0x255110f4ef3ddd11b67f468ff6d2b2aa5e18509f25d464b446b5d0201e5ba944` |
+| 1 | THREAT_INTELLIGENCE_INDICATOR | 73943 | `0xfc79fcd71b9d07aa922393b358a57244e9508fd9c2f5ed094803f31107e8cf20` | `0x18aab6e37bcff5c20aeff47ea2ce58926bce39ba6ba6f8398e655e895b09a638` |
+| 2 | URL_SCAN_VERDICT | 5001 | `0x98ce6ae9783fc6e887202aeb4504cb9d4abc951a21d7c1d0072ff9baa7ea543e` | `0xd9fc553857c15415bdd03106c13a82c806e5cd31ad3273ddc057e190d4ebb87a` |
+| 2 | URL_SCAN_VERDICT | 302 | `0xc7333c3d9c2b5dc0354452e9402c00564bec2f760aa80bc618e8a6d6a74623b9` | `0x71b27125a3000ae36126b787eabfe0d7096a5604a74cfd05fb9f05785b89b922` |
 
 ## Ledger snapshot (call 1)
 `GET /v1/ledger/account/{wallet}` → deposited 250000, balance 250000, available 240000, unbilled 10000 (uUSDC).
