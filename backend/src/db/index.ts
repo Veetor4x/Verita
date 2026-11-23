@@ -91,3 +91,15 @@ export async function getStats(): Promise<Stats> {
     latest: latest.map((r: any) => ({ signalHash: r.signal_hash, intent: r.intent, minerId: r.miner_id, round: r.round, at: new Date(r.created_at).toISOString() })),
   };
 }
+
+// ---- addresses seen per chat (look-alike / address-poisoning warning) ----
+export async function knownAddresses(chatId: string): Promise<string[]> {
+  const rows = (await sql().query(`select address from seen_addresses where chat_id = $1 order by first_seen desc limit 500`, [chatId])) as any[];
+  return rows.map((r) => String(r.address));
+}
+
+export async function rememberAddresses(chatId: string, addresses: string[]) {
+  for (const a of new Set(addresses.map((x) => x.toLowerCase()))) {
+    await sql().query(`insert into seen_addresses (chat_id, address) values ($1, $2) on conflict do nothing`, [chatId, a]);
+  }
+}

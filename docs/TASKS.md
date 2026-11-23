@@ -71,8 +71,13 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 
 - ⬜ **Escrow top-up needed:** escrow was down to about $0.3 at the end of Nov 23 (the live bot uses it). Run `NODE_USE_ENV_PROXY=1 node --disable-warning=ExperimentalWarning backend/scripts/deposit-escrow.mjs 5` (my attempt was blocked by a permission check)
 
+- ✅ Look-alike address warning (Nov 23, was NICE since Nov 18): per chat we remember the addresses seen; a new, different address with the same first 4 and last 4 characters triggers a second message with both addresses in full ("address poisoning"). Not part of the verdict; stored: chat id + address only (`seen_addresses`)
+- ✅ Review re-run live (Nov 23): the 3 small legit sites are 🟢 with "Reviews: none found."; popular 🟢; phishing look-alike 🔴. BitConnect varies by run (this time only a Wikipedia page, no adverse news) so it stays 🟡
+- ✅ Home page `/` (Nov 23): pitch, paste box (`POST /check`, max 3 things, 8 pastes/hour per IP + daily $ cap, one result redirects to `/c/:id`, several give a list), "Add to Telegram" (t.me/AskVeritaBot), How it works (3 steps), link to /stats. Mobile-first, light/dark
+- ✅ README: run instructions, env table, architecture, deploy; `docs/RECEIPTS.md` current (`backend/scripts/receipts-snapshot.mjs` regenerates the snapshot)
+
 ## Nov 24–25 — Web pages
-- ⬜ `/` paste box + explainer
+- ✅ `/` paste box + explainer (done Nov 23)
 - ✅ `/c/:id` verdict card + "More details" (miners, cost, receipts): mobile-first redesign (Nov 18), dark mode, tap-to-verify hashes, "Official site" button
 - ✅ `/stats` public page + `/api/stats`: checks run, USDC spent, receipts, escalated, latest 10 signal hashes (link to Telegraph verify)
 - ⬜ `/api/check`, `/api/check/run`, `/api/check/:id`, rate limiting, input validation
