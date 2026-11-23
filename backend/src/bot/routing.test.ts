@@ -1,7 +1,9 @@
 // Drives the real bot with fake Telegram updates and a fake check runner: no network, no money.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBot } from './index.js';
+import { createBot, READING_IMAGE, VIDEO_SOON, type ImageDeps } from './index.js';
+import { safeError } from './telegramFile.js';
+import { ImageError } from '../engine/checks/image.js';
 import type { Item } from '../engine/extract.js';
 import type { CheckResult } from '../../../shared/types.js';
 
@@ -14,13 +16,13 @@ function result(item: Item): CheckResult {
 }
 
 let n = 1000;
-async function drive(message: Record<string, unknown>, chatType: 'private' | 'supergroup' = 'private') {
+async function drive(message: Record<string, unknown>, chatType: 'private' | 'supergroup' = 'private', imageDeps?: ImageDeps) {
   const ran: Item[] = []; const sent: { method: string; payload: any }[] = [];
   const bot = createBot('123:TEST', async (item) => { ran.push(item); return result(item); }, {
     botInfo: { id: 123, is_bot: true, first_name: 'Verita', username: 'VeritaCheckBot', can_join_groups: true, can_read_all_group_messages: true, supports_inline_queries: false, can_connect_to_business: false, has_main_web_app: false } as any,
-  });
+  }, imageDeps);
   bot.api.config.use(async (_prev, method, payload) => { sent.push({ method, payload }); return { ok: true, result: method === 'sendMessage' ? { message_id: 1, date: 0, chat: { id: 1, type: chatType } } : true } as any; });
-  const base = { message_id: ++n, date: 0, chat: { id: 1, type: chatType, ...(chatType === 'supergroup' ? { title: 'g' } : { first_name: 'u' }) }, from: { id: 42, is_bot: false, first_name: 'u' } };
+  const base = { message_id: ++n, date: 0, chat: { id: 1, type: chatType, ...(chatType === 'supergroup' ? { title: 'g' } : { first_name: 'u' }) }, from: { id: 10_000 + n, is_bot: false, first_name: 'u' } }; // a new user each time, so the 20/min rate limit never interferes
   await bot.handleUpdate({ update_id: ++n, message: { ...base, ...message } } as any);
   return { ran, replies: sent.filter((s) => s.method === 'sendMessage').map((s) => String(s.payload.text)) };
 }
@@ -85,4 +87,104 @@ test('GROUP: /reviews as a reply uses the replied message; with nothing it expla
 });
 test('plain DM text is never a /reviews check (no accidental purchases)', async () => {
   assert.equal((await drive({ text: 'is Acme Plumbing Ltd any good?' })).ran.every((i) => i.kind !== 'REVIEW'), true);
+});
+
+// ---------------- images ----------------
+function fakeImages(opts: { failDownload?: Error; items?: CheckResult[] } = {}) {
+  const calls = { downloaded: [] as string[], analysed: [] as { size: number; caption: string }[], saved: [] as string[] };
+  const summary: CheckResult = { ...result({ kind: 'CLAIM', value: 'x' }), id: 'img12345', kind: 'IMAGE', input: 'Image (screenshot or photo)', reasons: ['Found in the image: 1 link.'] };
+  const deps: ImageDeps = {
+    download: async (id) => { calls.downloaded.push(id); if (opts.failDownload) throw opts.failDownload; return Buffer.from('fake image bytes'); },
+    analyse: async (buf, caption) => { calls.analysed.push({ size: buf.length, caption }); return { summary, items: opts.items ?? [] }; },
+    save: async (r) => { calls.saved.push(r.id); },
+  };
+  return { deps, calls };
+}
+const photoMsg = (extra: Record<string, unknown> = {}) => ({ photo: [{ file_id: 'small', file_unique_id: 'a', width: 90, height: 90, file_size: 1000 }, { file_id: 'big', file_unique_id: 'b', width: 1280, height: 960, file_size: 90000 }], ...extra });
+const chat = (type: string) => ({ id: 1, type, ...(type === 'supergroup' ? { title: 'g' } : {}) });
+
+test('DM: a photo is downloaded (biggest size), analysed, saved, and answered', async () => {
+  const { deps, calls } = fakeImages();
+  const { replies } = await drive(photoMsg({ caption: 'is this real?' }), 'private', deps);
+  assert.deepEqual(calls.downloaded, ['big']);
+  assert.deepEqual(calls.analysed, [{ size: 16, caption: 'is this real?' }]);
+  assert.deepEqual(calls.saved, ['img12345']);
+  assert.equal(replies[0], READING_IMAGE); // acknowledged right away: the real answer can take a minute
+  assert.match(replies[1], /Image/);
+});
+test('DM: the summary comes first, then each thing found (worst first order is kept)', async () => {
+  const items = [{ ...result({ kind: 'LINK', value: 'http://bad.xyz' }), verdict: 'SCAM' as const }, { ...result({ kind: 'CLAIM', value: 'a claim here now' }), verdict: 'CAREFUL' as const }];
+  const { deps } = fakeImages({ items });
+  const { replies } = await drive(photoMsg(), 'private', deps);
+  assert.equal(replies.length, 4);
+  assert.equal(replies[0], READING_IMAGE);
+  assert.match(replies[1], /Image/); assert.match(replies[2], /Likely scam/); assert.match(replies[3], /Unverified/);
+});
+test('DM: an image sent as a file is checked; a PDF or other file is ignored', async () => {
+  const a = fakeImages();
+  await drive({ document: { file_id: 'doc1', file_unique_id: 'd', mime_type: 'image/png', file_name: 's.png' } }, 'private', a.deps);
+  assert.deepEqual(a.calls.downloaded, ['doc1']);
+  const b = fakeImages();
+  const r = await drive({ document: { file_id: 'doc2', file_unique_id: 'd2', mime_type: 'application/pdf', file_name: 'x.pdf' } }, 'private', b.deps);
+  assert.equal(b.calls.downloaded.length, 0); assert.equal(r.replies.length, 0);
+});
+
+test('GROUP: a normal photo is NEVER checked or answered', async () => {
+  const { deps, calls } = fakeImages();
+  const { replies } = await drive(photoMsg(), 'supergroup', deps);
+  assert.equal(calls.downloaded.length, 0); assert.equal(replies.length, 0);
+});
+test('GROUP: a photo whose caption has a link still gets the link guard (not the image check)', async () => {
+  const { deps, calls } = fakeImages();
+  const { ran } = await drive(photoMsg({ caption: 'free money http://malware.wicar.org/data/x.html' }), 'supergroup', deps);
+  assert.equal(calls.downloaded.length, 0); assert.deepEqual(ran.map((i) => i.kind), ['LINK']);
+});
+test('GROUP: /check as a reply to a photo checks the image; so does a photo captioned /check', async () => {
+  const a = fakeImages();
+  await drive({ ...cmd('/check'), reply_to_message: { message_id: 7, date: 0, chat: chat('supergroup'), ...photoMsg() } }, 'supergroup', a.deps);
+  assert.deepEqual(a.calls.downloaded, ['big']);
+  const b = fakeImages();
+  await drive({ ...photoMsg(), caption: '/check', caption_entities: [{ type: 'bot_command', offset: 0, length: 6 }] }, 'supergroup', b.deps);
+  assert.deepEqual(b.calls.downloaded, ['big']);
+});
+
+test('VIDEO: DM gets the exact coming-soon reply; a group stays silent; /check on a video gets the reply', async () => {
+  const video = { video: { file_id: 'v1', file_unique_id: 'v', width: 1, height: 1, duration: 3 } };
+  const dm = await drive(video, 'private', fakeImages().deps);
+  assert.deepEqual(dm.replies, ['Video checks are coming soon. Send a screenshot instead.']);
+  assert.equal(VIDEO_SOON, 'Video checks are coming soon. Send a screenshot instead.');
+  const note = await drive({ video_note: { file_id: 'vn', file_unique_id: 'vn', length: 240, duration: 3 } }, 'private', fakeImages().deps);
+  assert.deepEqual(note.replies, [VIDEO_SOON]);
+  const gif = await drive({ animation: { file_id: 'an', file_unique_id: 'an', width: 1, height: 1, duration: 1 } }, 'private', fakeImages().deps);
+  assert.deepEqual(gif.replies, [VIDEO_SOON]);
+  const group = await drive(video, 'supergroup', fakeImages().deps);
+  assert.equal(group.replies.length, 0);
+  const viaCheck = await drive({ ...cmd('/check'), reply_to_message: { message_id: 7, date: 0, chat: chat('supergroup'), ...video } }, 'supergroup', fakeImages().deps);
+  assert.deepEqual(viaCheck.replies, [VIDEO_SOON]);
+});
+
+test('download problems give a plain message and never mention a URL or the bot token', async () => {
+  const tooBig = fakeImages({ failDownload: new ImageError('That image is too large (max 5 MB).') });
+  assert.deepEqual((await drive(photoMsg(), 'private', tooBig.deps)).replies, [READING_IMAGE, 'That image is too large (max 5 MB).']);
+  const leaky = fakeImages({ failDownload: new Error('fetch failed: https://api.telegram.org/file/bot123:TEST/photos/file_1.jpg') });
+  const { replies } = await drive(photoMsg(), 'private', leaky.deps);
+  assert.equal(replies.length, 2);
+  assert.ok(replies.every((r) => !/123:TEST|api\.telegram\.org|file\/bot/.test(r)), replies.join(' | '));
+  assert.match(replies[1], /Sorry, I could not check that image/); // generic wording for unexpected errors
+});
+
+test('safeError strips the token from anything that gets logged', () => {
+  const token = '123456:ABC-secret';
+  const e = new Error(`request to https://api.telegram.org/file/bot${token}/photos/a.jpg failed`);
+  const s = safeError(e, token);
+  assert.ok(!s.includes(token) && !s.includes('ABC-secret'), s);
+  assert.ok(!/file\/bot[0-9]/.test(s), s);
+});
+
+test('titles: a plain photo with no text is "No text to check", not a warning; real findings keep their titles', async () => {
+  const { titleOf } = await import('./format.js');
+  const { NO_TEXT_LINE } = await import('../engine/image.js');
+  assert.equal(titleOf({ kind: 'IMAGE', verdict: 'CAREFUL', reasons: [NO_TEXT_LINE, '2 checks bought on the image itself: image verification, deepfake check.'] }), '🟡 No text to check in this image');
+  assert.equal(titleOf({ kind: 'IMAGE', verdict: 'CAREFUL', reasons: ['Found in the image: 1 link.'] }), '🟡 Be careful with this image');
+  assert.equal(titleOf({ kind: 'IMAGE', verdict: 'SCAM', reasons: [NO_TEXT_LINE] }), '🔴 Risky content in this image');
 });

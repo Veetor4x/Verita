@@ -3,6 +3,7 @@ import type { CheckResult } from '../../../shared/types.js';
 import { DISCLAIMER } from '../engine/verdict.js';
 import { CLAIM_OFFICIAL_TEXT } from '../engine/claims.js';
 import { shortAddr } from '../engine/payments.js';
+import { NO_TEXT_LINE } from '../engine/image.js';
 
 export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -11,8 +12,11 @@ const TITLES = {
   CLAIM: { SAFE: '🟢 Confirmed true', CAREFUL: '🟡 Unverified or mixed', SCAM: '🔴 Likely false' },
   PAYMENT: { SAFE: '🟢 Looks fine', CAREFUL: '🟡 Be careful', SCAM: '🔴 High risk' },
   REVIEW: { SAFE: '🟢 Reviews look good', CAREFUL: '🟡 Reputation unclear', SCAM: '🔴 Scam reports found' },
+  IMAGE: { SAFE: '🟢 Nothing risky in this image', CAREFUL: '🟡 Be careful with this image', SCAM: '🔴 Risky content in this image' },
 } as const;
-export const titleOf = (r: Pick<CheckResult, 'kind' | 'verdict'>) => TITLES[r.kind][r.verdict];
+export const titleOf = (r: Pick<CheckResult, 'kind' | 'verdict'> & { reasons?: string[] }) =>
+  // A plain photo with no text is not a warning: it just has nothing for us to check.
+  r.kind === 'IMAGE' && r.verdict === 'CAREFUL' && r.reasons?.includes(NO_TEXT_LINE) ? '🟡 No text to check in this image' : TITLES[r.kind][r.verdict];
 
 /** Show long hex values short: 0x98b1…2519 (display only; the result page has the full values). */
 export const shortenHex = (s: string) => s.replace(/0x[0-9a-fA-F]{40,64}\b/g, (h) => (h.length > 42 ? `${h.slice(0, 10)}…${h.slice(-6)}` : shortAddr(h)));
@@ -36,11 +40,12 @@ export function formatResult(r: CheckResult): string {
   const cost = `$${r.details.totalCostUsd.toFixed(2)}`;
   const subject =
     r.kind === 'CLAIM' ? `<i>“${esc(r.input.slice(0, 200))}${r.input.length > 200 ? '…' : ''}”</i>`
+    : r.kind === 'IMAGE' ? '<i>🖼 Image</i>'
     : r.kind === 'PAYMENT' ? `<code>${esc(shortenHex(r.input))}</code>`
     : `<code>${esc(r.input.slice(0, 200))}</code>`;
 
   const lines = [`<b>${titleOf(r)}</b>`, subject, ''];
-  if (r.kind === 'PAYMENT' && r.details.facts?.length) {
+  if ((r.kind === 'PAYMENT' || r.kind === 'IMAGE') && r.details.facts?.length) {
     for (const f of r.details.facts) if (f.label !== 'Token contract') lines.push(`<b>${esc(f.label)}:</b> ${esc(shortenHex(f.value))}`);
     lines.push('');
   }

@@ -5,6 +5,7 @@ import { config } from './config.js';
 import { migrate, getCheck, getStats } from './db/index.js';
 import { createBot } from './bot/index.js';
 import { resultPage, statsPage } from './web/pages.js';
+import { serveHostedImage } from './web/imageRoute.js';
 
 process.on('unhandledRejection', (e) => console.error('unhandled:', (e as Error)?.message ?? e));
 
@@ -14,6 +15,9 @@ app.use(express.json({ limit: '100kb' }));
 app.use(express.static(fileURLToPath(new URL('./web/public', import.meta.url))));
 
 app.get('/health', (_req, res) => { res.json({ ok: true }); });
+
+// A checked image, hosted for about a minute so forensic miners can fetch it (see engine/imagehost.ts).
+app.get('/i/:name', serveHostedImage);
 
 app.get('/api/check/:id', async (req, res) => {
   const r = await getCheck(req.params.id).catch(() => null);
