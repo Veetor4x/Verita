@@ -4,17 +4,25 @@ import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { migrate, getCheck, getStats } from './db/index.js';
 import { createBot } from './bot/index.js';
-import { resultPage, statsPage } from './web/pages.js';
+import { resultPage, statsPage, landingPage } from './web/pages.js';
+import { makeCheckHandler } from './web/checkRoute.js';
+import { runCheck } from './engine/run.js';
 import { serveHostedImage } from './web/imageRoute.js';
 
 process.on('unhandledRejection', (e) => console.error('unhandled:', (e as Error)?.message ?? e));
 
 const app = express();
 app.disable('x-powered-by');
+app.set('trust proxy', 1); // behind Render's proxy: req.ip is the visitor (used by the paste-box rate limit)
 app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: false, limit: '20kb' }));
 app.use(express.static(fileURLToPath(new URL('./web/public', import.meta.url))));
 
 app.get('/health', (_req, res) => { res.json({ ok: true }); });
+
+// Home page: pitch, paste box, Add to Telegram, how it works.
+app.get('/', (_req, res) => { res.type('html').send(landingPage()); });
+app.post('/check', makeCheckHandler(runCheck));
 
 // A checked image, hosted for about a minute so forensic miners can fetch it (see engine/imagehost.ts).
 app.get('/i/:name', serveHostedImage);

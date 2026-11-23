@@ -12,7 +12,8 @@ import { entityFrom } from '../engine/reputation.js';
 import { runCheck } from '../engine/run.js';
 import { analyseImage, ImageError } from '../engine/checks/image.js';
 import { MAX_IMAGE_BYTES } from '../engine/image.js';
-import { saveCheck } from '../db/index.js';
+import { saveCheck, knownAddresses, rememberAddresses } from '../db/index.js';
+import { addressesOfResult, findLookalikes, lookalikeWarning } from '../engine/lookalike.js';
 import { formatResult } from './format.js';
 import { downloadTelegramFile, safeError } from './telegramFile.js';
 import { config } from '../config.js';
@@ -49,6 +50,10 @@ const captionCheck = (caption: string | undefined) => CAPTION_CHECK.test(caption
 const withoutCommand = (caption: string | undefined) => (caption ?? '').replace(CAPTION_CHECK, '');
 
 type Runner = typeof runCheck;
+
+/** After a payment result: warn about look-alike addresses seen earlier in this chat. Injectable for tests. */
+export type LookalikeDeps = { known: (chatId: string) => Promise<string[]>; remember: (chatId: string, addresses: string[]) => Promise<void> };
+type After = (ctx: Context, r: CheckResult, opts: Record<string, unknown>) => Promise<void>;
 
 /** Injectable so the routing can be tested without network or Telegram. */
 export type ImageDeps = {
@@ -89,13 +94,15 @@ async function sendResult(ctx: Context, r: CheckResult, opts: Record<string, unk
 const replyOpts = (replyTo: number) => ({ reply_parameters: { message_id: replyTo, allow_sending_without_reply: true }, parse_mode: 'HTML' as const });
 
 /** Run the checks for these items and reply to `replyTo` with one message each. */
-async function answer(ctx: Context, items: Item[], replyTo: number, run: Runner) {
+async function answer(ctx: Context, items: Item[], replyTo: number, run: Runner, after?: After) {
   if (ctx.from && limited(ctx.from.id)) { await ctx.reply('Slow down a little, try again in a minute.'); return; }
   const opts = replyOpts(replyTo);
   await ctx.replyWithChatAction('typing').catch(() => {});
   for (const item of items) {
     try {
-      await sendResult(ctx, await run(item), opts);
+      const r = await run(item);
+      await sendResult(ctx, r, opts);
+      await after?.(ctx, r, opts);
     } catch (e) {
       console.error('check failed:', (e as Error).message);
       await ctx.reply('Sorry, I could not check that right now. Please try again.', opts).catch(() => {});
@@ -104,12 +111,28 @@ async function answer(ctx: Context, items: Item[], replyTo: number, run: Runner)
 }
 
 /** `run`, `botConfig` and `images` are injectable so the routing can be tested without network. */
-export function createBot(token: string, run: Runner = runCheck, botConfig?: BotConfig<Context>, imageDeps?: ImageDeps) {
+export function createBot(token: string, run: Runner = runCheck, botConfig?: BotConfig<Context>, imageDeps?: ImageDeps, lookalike: LookalikeDeps = { known: knownAddresses, remember: rememberAddresses }) {
   const bot = new Bot(token, botConfig);
   const images: ImageDeps = imageDeps ?? {
     download: (fileId) => downloadTelegramFile(bot.api, token, fileId),
     analyse: (buf, caption) => analyseImage(buf, { run, publicUrl: config.imageForensics ? config.publicUrl : undefined, caption }),
     save: saveCheck,
+  };
+
+  /** Look-alike (address-poisoning) warning for payment results. A failure here must never break the main answer. */
+  const after: After = async (ctx, r, opts) => {
+    if (r.kind !== 'PAYMENT' || !ctx.chat) return;
+    try {
+      const chatId = String(ctx.chat.id);
+      const addrs = addressesOfResult(r.input, r.details.facts);
+      if (addrs.length === 0) return;
+      const known = await lookalike.known(chatId);
+      for (const a of addrs) {
+        const similar = findLookalikes(a, known);
+        if (similar.length) await ctx.reply(lookalikeWarning(a, similar), { ...opts, link_preview_options: { is_disabled: true } } as any);
+      }
+      await lookalike.remember(chatId, addrs);
+    } catch (e) { console.error('lookalike check failed:', (e as Error).message); }
   };
 
   /** Download, read and check one image. Replies: a summary first, then each thing found, worst first. */
@@ -123,7 +146,7 @@ export function createBot(token: string, run: Runner = runCheck, botConfig?: Bot
       const { summary, items } = await images.analyse(buf, caption);
       await images.save(summary);
       await sendResult(ctx, summary, opts);
-      for (const r of items) await sendResult(ctx, r, opts);
+      for (const r of items) { await sendResult(ctx, r, opts); await after(ctx, r, opts); }
     } catch (e) {
       console.error('image check failed:', safeError(e, token)); // never log a message that could contain the token
       await ctx.reply(e instanceof ImageError ? e.message : 'Sorry, I could not check that image right now. Please try again.', opts).catch(() => {});
@@ -144,7 +167,7 @@ export function createBot(token: string, run: Runner = runCheck, botConfig?: Bot
     if (!text.trim()) { await ctx.reply('Reply to a message with /check, or send /check followed by the text, link, transaction or address.', { reply_parameters: { message_id: ctx.message!.message_id } }); return; }
     const items = classify(text);
     if (items.length === 0) { await ctx.reply('I could not find a link, transaction, address or claim to check in that message.', { reply_parameters: { message_id: replyTo, allow_sending_without_reply: true } }); return; }
-    await answer(ctx, items, replyTo, run);
+    await answer(ctx, items, replyTo, run, after);
   });
 
   // /reviews <business name or website>, or reply to a message with /reviews.
@@ -195,7 +218,7 @@ export function createBot(token: string, run: Runner = runCheck, botConfig?: Bot
     }
     const items = classify(text);
     if (items.length === 0) { await ctx.reply('Send me a link, a transaction hash, a wallet address, a screenshot, or a claim to fact-check (a full sentence).'); return; }
-    await answer(ctx, items, ctx.message!.message_id, run);
+    await answer(ctx, items, ctx.message!.message_id, run, after);
   });
 
   bot.catch((err) => console.error('bot error:', safeError(err, token)));

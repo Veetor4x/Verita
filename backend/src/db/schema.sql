@@ -30,3 +30,11 @@ create index if not exists purchases_check_idx on purchases (check_id);
 create index if not exists purchases_day_idx on purchases (created_at);
 
 alter table checks add column if not exists result jsonb;
+
+-- addresses seen per chat (public blockchain data only, no message text): for the look-alike address warning
+create table if not exists seen_addresses (
+  chat_id text not null,
+  address text not null,
+  first_seen timestamptz not null default now(),
+  primary key (chat_id, address)
+);

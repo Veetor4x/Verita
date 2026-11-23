@@ -17,9 +17,9 @@ const page = (title: string, body: string, description: string) => `<!doctype ht
 <title>${esc(title)}</title>
 <link rel="stylesheet" href="/style.css"></head>
 <body><main>
-<header class="top"><a class="brand" href="/stats">Verità</a><span class="net">Sepolia testnet</span></header>
+<header class="top"><a class="brand" href="/">Verità</a><span class="net">Sepolia testnet</span></header>
 ${body}
-<footer><p class="warn">${DISCLAIMER}</p></footer>
+<footer><p class="warn">${DISCLAIMER}</p><p class="meta"><a href="/">Home</a> · <a href="/stats">Stats</a></p></footer>
 </main></body></html>`;
 
 /** Link that lets anyone verify a signal on Telegraph. Only real 0x…64-hex hashes become links. */
@@ -106,4 +106,46 @@ export function statsPage(s: Stats): string {
 <p class="meta">Tap one to verify it on Telegraph.</p>
 <ul class="hashes">${latest || '<li class="meta">No purchases yet.</li>'}</ul>`;
   return page('Verità – Stats', body, 'Public stats: checks run, USDC spent and the latest Telegraph signal hashes.');
+}
+
+export const TELEGRAM_BOT_URL = 'https://t.me/AskVeritaBot';
+export const MAX_WEB_TEXT = 4000;
+
+/** The home page: pitch, paste box, Add to Telegram, how it works, link to /stats. Server-rendered, no JS needed. */
+export function landingPage(opts: { error?: string; text?: string } = {}): string {
+  const body = `
+<h1>Check before you act.</h1>
+<p class="lead">Check if a link, a news claim or a crypto payment is legit before you act on it. Every verdict is bought from several ranked Telegraph miners, with on-chain receipts.</p>
+
+${opts.error ? `<p class="card careful err" role="alert">${esc(opts.error)}</p>` : ''}
+<form class="paste" method="post" action="/check" onsubmit="var b=this.querySelector('button');b.disabled=true;b.textContent='Checking… this can take up to a minute'">
+  <label for="text" class="lbl">Paste a link, a claim, a transaction hash or a wallet address</label>
+  <textarea id="text" name="text" rows="5" maxlength="${MAX_WEB_TEXT}" required placeholder="https://… or a statement to fact-check, or 0x…">${esc(opts.text ?? '')}</textarea>
+  <button class="btn" type="submit">Check</button>
+</form>
+
+<a class="btn tg" href="${TELEGRAM_BOT_URL}" rel="noopener" target="_blank">Add to Telegram</a>
+<p class="meta">In a group the bot checks every link posted. Reply to anything else with /check. It also reads screenshots.</p>
+
+<h2>How it works</h2>
+<ol class="steps">
+  <li><strong>You send something.</strong> A link, a claim, a transaction or wallet address, or a screenshot (Telegram).</li>
+  <li><strong>Verità buys evidence.</strong> It pays several ranked Telegraph miners itself, and buys more from other miners when the first answers disagree.</li>
+  <li><strong>You get a verdict you can check.</strong> 🟢 looks safe, 🟡 be careful or 🔴 likely scam, with the reasons and the receipts (tap a hash to verify it on Telegraph).</li>
+</ol>
+
+<p><a href="/stats">See the live numbers and receipts →</a></p>`;
+  return page('Verità – check before you act', body, 'Check if a link, a news claim or a crypto payment is legit before you act on it. Verdicts are bought from several ranked Telegraph miners, with on-chain receipts.');
+}
+
+/** Several things were checked from one paste: one card per result, worst first. */
+export function resultsPage(results: CheckResult[]): string {
+  const cards = results.map((r) => `
+<a class="card ${CLASS[r.verdict]} item" href="/c/${esc(r.id)}">
+  <strong>${titleOf(r)}</strong>
+  <span class="url">${esc(r.input.length > 90 ? r.input.slice(0, 90) + '…' : r.input)}</span>
+  <span>${esc(r.reasons[0] ?? '')}</span>
+</a>`).join('');
+  const body = `<h1>${results.length} results</h1><p class="meta">Tap one for the full details and receipts.</p>${cards}<p><a href="/">Check something else</a></p>`;
+  return page('Verità – results', body, `${results.length} results`);
 }

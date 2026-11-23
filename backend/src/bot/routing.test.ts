@@ -1,7 +1,7 @@
 // Drives the real bot with fake Telegram updates and a fake check runner: no network, no money.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBot, READING_IMAGE, VIDEO_SOON, type ImageDeps } from './index.js';
+import { createBot, READING_IMAGE, VIDEO_SOON, type ImageDeps, type LookalikeDeps } from './index.js';
 import { safeError } from './telegramFile.js';
 import { ImageError } from '../engine/checks/image.js';
 import type { Item } from '../engine/extract.js';
@@ -16,11 +16,12 @@ function result(item: Item): CheckResult {
 }
 
 let n = 1000;
-async function drive(message: Record<string, unknown>, chatType: 'private' | 'supergroup' = 'private', imageDeps?: ImageDeps) {
+const noHistory: LookalikeDeps = { known: async () => [], remember: async () => {} }; // never the real database in tests
+async function drive(message: Record<string, unknown>, chatType: 'private' | 'supergroup' = 'private', imageDeps?: ImageDeps, lookalike: LookalikeDeps = noHistory) {
   const ran: Item[] = []; const sent: { method: string; payload: any }[] = [];
   const bot = createBot('123:TEST', async (item) => { ran.push(item); return result(item); }, {
     botInfo: { id: 123, is_bot: true, first_name: 'Verita', username: 'VeritaCheckBot', can_join_groups: true, can_read_all_group_messages: true, supports_inline_queries: false, can_connect_to_business: false, has_main_web_app: false } as any,
-  }, imageDeps);
+  }, imageDeps, lookalike);
   bot.api.config.use(async (_prev, method, payload) => { sent.push({ method, payload }); return { ok: true, result: method === 'sendMessage' ? { message_id: 1, date: 0, chat: { id: 1, type: chatType } } : true } as any; });
   const base = { message_id: ++n, date: 0, chat: { id: 1, type: chatType, ...(chatType === 'supergroup' ? { title: 'g' } : { first_name: 'u' }) }, from: { id: 10_000 + n, is_bot: false, first_name: 'u' } }; // a new user each time, so the 20/min rate limit never interferes
   await bot.handleUpdate({ update_id: ++n, message: { ...base, ...message } } as any);
@@ -187,4 +188,40 @@ test('titles: a plain photo with no text is "No text to check", not a warning; r
   assert.equal(titleOf({ kind: 'IMAGE', verdict: 'CAREFUL', reasons: [NO_TEXT_LINE, '2 checks bought on the image itself: image verification, deepfake check.'] }), '🟡 No text to check in this image');
   assert.equal(titleOf({ kind: 'IMAGE', verdict: 'CAREFUL', reasons: ['Found in the image: 1 link.'] }), '🟡 Be careful with this image');
   assert.equal(titleOf({ kind: 'IMAGE', verdict: 'SCAM', reasons: [NO_TEXT_LINE] }), '🔴 Risky content in this image');
+});
+
+// ---------------- look-alike addresses ----------------
+const REAL_ADDR = '0x98B19CA45dc94C94ea5053a516c69D2b04312519';
+const FAKE_ADDR = '0x98B1' + 'f'.repeat(32) + '2519';
+function history(seen: string[]) {
+  const remembered: { chat: string; addrs: string[] }[] = [];
+  const deps: LookalikeDeps = { known: async () => seen, remember: async (chat, addrs) => { remembered.push({ chat, addrs }); } };
+  return { deps, remembered };
+}
+
+test('LOOKALIKE: an address that imitates one seen before in this chat gets a second, full-length warning', async () => {
+  const h = history([REAL_ADDR.toLowerCase()]);
+  const { replies } = await drive({ text: `is ${FAKE_ADDR} safe?` }, 'private', undefined, h.deps);
+  assert.equal(replies.length, 2);
+  assert.match(replies[1], /Look-alike address/);
+  assert.ok(replies[1].includes(FAKE_ADDR.toLowerCase()) && replies[1].includes(REAL_ADDR.toLowerCase())); // both in full
+  assert.deepEqual(h.remembered.map((r) => r.addrs), [[FAKE_ADDR.toLowerCase()]]); // remembered AFTER the check
+});
+test('LOOKALIKE: the same address again, or an unrelated one, gets no warning; the address is remembered', async () => {
+  const h = history([REAL_ADDR.toLowerCase()]);
+  assert.equal((await drive({ text: `is ${REAL_ADDR} safe?` }, 'private', undefined, h.deps)).replies.length, 1);
+  assert.equal((await drive({ text: `is 0x${'a'.repeat(40)} safe?` }, 'private', undefined, h.deps)).replies.length, 1);
+  assert.equal(h.remembered.length, 2);
+});
+test('LOOKALIKE: a database failure never breaks the main answer', async () => {
+  const broken: LookalikeDeps = { known: async () => { throw new Error('db down'); }, remember: async () => {} };
+  const { replies } = await drive({ text: `is ${FAKE_ADDR} safe?` }, 'private', undefined, broken);
+  assert.equal(replies.length, 1);
+});
+test('LOOKALIKE: claims and links never touch the address history', async () => {
+  let called = 0;
+  const spy: LookalikeDeps = { known: async () => { called++; return []; }, remember: async () => { called++; } };
+  await drive({ text: 'Argentina won the 2022 FIFA World Cup.' }, 'private', undefined, spy);
+  await drive({ text: 'check https://example.com/x' }, 'private', undefined, spy);
+  assert.equal(called, 0);
 });
