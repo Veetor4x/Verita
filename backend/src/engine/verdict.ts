@@ -14,6 +14,11 @@ export type LinkFacts = {
   popular?: boolean;
   /** Set when the domain pretends to be a known brand (see brands.ts). Counts as ONE flag. */
   brandImpersonation?: { brand: string; officialDomain: string };
+  /**
+   * What reviews / adverse news say (reputation.ts). Not set for popular sites (skipped).
+   * 'scam' counts as ONE flag; 'none' stops a lone 🟢 (unknown is not safe); the others are information.
+   */
+  reputation?: { state: 'scam' | 'positive' | 'mixed' | 'presence' | 'none'; line: string };
 };
 
 export const DISCLAIMER = '⚠️ Always confirm on official channels before acting.';
@@ -66,26 +71,17 @@ export function signalsAgree(all: Signal[]): boolean {
 }
 
 /**
- * Deterministic link verdict. Same signals in -> same verdict out (order does not matter).
- *
- * - Popular domain (bundled top-sites list): 🟢 unless 2+ sources flag it. Never 🟡 just because one miner disagrees.
- * - 2 usable answers (Round 1): both flag -> 🔴, one flags -> 🟡, none -> 🟢.
- * - Fewer than 2 independent usable answers and nobody flagged: 🟡 (unknown is not safe).
- * - 3+ usable answers (agent escalated): MAJORITY vote across ALL sources.
- *     more than half flag -> 🔴 | nobody flags -> 🟢 | anything in between (incl. ties) -> 🟡.
- */
-/**
  * "4 checks bought: 1 flagged it, 1 found no threat, 2 couldn't check this link."
  * Counts every purchase we made (one line per bought answer), NOT the de-duplicated votes the verdict uses,
  * so the numbers always match the receipts. The free brand check is never part of it.
  */
-export function boughtLine(bought: Signal[]): string {
-  const n = bought.length;
+export function boughtLine(bought: Signal[], reviewChecks = 0): string {
+  const n = bought.length + reviewChecks;
   if (n === 0) return 'No checks could be bought.';
   const f = bought.filter((s) => s.flagged === true).length;
   const c = bought.filter((s) => s.flagged === false).length;
-  const u = n - f - c;
-  const parts = [f && `${f} flagged it`, c && `${c} found no threat`, u && `${u} couldn't check this link`].filter(Boolean);
+  const u = bought.length - f - c;
+  const parts = [f && `${f} flagged it`, c && `${c} found no threat`, u && `${u} couldn't check this link`, reviewChecks && `${reviewChecks} for reviews and news`].filter(Boolean);
   return `${n} check${n > 1 ? 's' : ''} bought: ${parts.join(', ')}.`;
 }
 
@@ -97,23 +93,32 @@ export function boughtLine(bought: Signal[]): string {
  * - 3+ usable answers (agent escalated): MAJORITY vote across ALL sources.
  *     more than half flag -> 🔴 | nobody flags -> 🟢 | anything in between (incl. ties) -> 🟡.
  * - Fewer than 2 independent usable answers and nobody flagged: 🟡 (unknown is not safe).
- * - Brand impersonation (brands.ts) counts as one extra flag.
+ * - Brand impersonation (brands.ts) and scam reports in reviews/news (reputation.ts) each count as one extra flag.
+ * - "No reviews found" never gives a 🟢 on its own: a 🟢 becomes 🟡 with the reason "No reviews found — new or unknown
+ *   sites are higher risk". (Popular sites skip the review check.)
  *
- * Reasons (max 3): brand line first, then one number-free sentence explaining the verdict,
- * then the "N checks bought: ..." line built from what was actually purchased.
+ * Reasons (max 3): brand line, reviews line, one number-free sentence explaining the verdict,
+ * then the "N checks bought: ..." line built from what was actually purchased (`reviewChecks` = review purchases).
  */
-export function linkVerdict(miners: Signal[], facts: LinkFacts = {}): { verdict: Verdict; reasons: string[] } {
+export function linkVerdict(miners: Signal[], facts: LinkFacts = {}, reviewChecks = 0): { verdict: Verdict; reasons: string[] } {
   const brand = facts.brandImpersonation;
-  // The brand check is one more (free, deterministic) source that says "bad".
-  const all: Signal[] = brand ? [...miners, { intent: 'BRAND_IMPERSONATION', minerId: 'verita:brand-check', flagged: true }] : miners;
+  const rep = facts.reputation;
+  const repFlag = rep?.state === 'scam';
+  // Brand and reputation are extra (free or already-bought) sources that say "bad".
+  const all: Signal[] = [
+    ...miners,
+    ...(brand ? [{ intent: 'BRAND_IMPERSONATION', minerId: 'verita:brand-check', flagged: true as const }] : []),
+    ...(repFlag ? [{ intent: 'REPUTATION', minerId: 'verita:reputation', flagged: true as const }] : []),
+  ];
   const usable = onePerMiner(all).filter((s) => s.flagged !== null);
   const flagged = usable.filter((s) => s.flagged === true).length;
   const young = facts.domainAgeDays != null && facts.domainAgeDays < 30;
-  const bought = boughtLine(miners);
+  const bought = boughtLine(miners, reviewChecks);
   const minerFlags = miners.filter((s) => s.flagged === true).length;
   const clean = usable.length - flagged;
+  const extra = Boolean(brand) || repFlag; // a line other than "why" already explains a flag
   let verdict: Verdict;
-  let why: string;
+  let why: string | null;
 
   if (facts.popular && flagged < 2) {
     verdict = 'SAFE';
@@ -134,19 +139,27 @@ export function linkVerdict(miners: Signal[], facts: LinkFacts = {}): { verdict:
   } else if (young) {
     verdict = 'CAREFUL';
     why = 'The checks found no threat, but the domain is very new.';
+  } else if (rep?.state === 'none') {
+    // The scans found nothing, but nobody has anything to say about this site either: that is not a reason for 🟢.
+    verdict = 'CAREFUL';
+    why = null; // the "No reviews found" line is the reason
   } else {
     verdict = 'SAFE';
     why = 'Independent sources found no threat.';
   }
 
-  const reasons: string[] = [];
-  if (brand) reasons.push(`Pretends to be ${brand.brand}, but isn't the official site (${brand.officialDomain}).`);
-  // A brand-only flag with no paid evidence: the brand line already says it, skip the vague sentence.
-  // Skip the sentence when it would only repeat the other lines: a brand-only flag (the brand line says it), or
-  // brand + a paid flag (the brand line and the "N checks bought: 1 flagged it" line already say both).
-  const repeats = brand && ((minerFlags === 0 && verdict === 'CAREFUL' && clean === 0) || (minerFlags > 0 && verdict === 'SCAM'));
-  if (!repeats) reasons.push(why);
-  reasons.push(bought);
-  if (young) reasons.push(`The domain is only ${facts.domainAgeDays} days old.`);
-  return { verdict, reasons: reasons.slice(0, 3) };
+  // Skip the sentence when it would only repeat the other lines (brand/reviews already explain the flag,
+  // and the "N checks bought: 1 flagged it" line says how many paid sources agreed).
+  const repeats = extra && ((minerFlags === 0 && verdict === 'CAREFUL' && clean === 0) || (minerFlags > 0 && verdict === 'SCAM'));
+  const lines = {
+    brand: brand ? `Pretends to be ${brand.brand}, but isn't the official site (${brand.officialDomain}).` : null,
+    rep: rep ? rep.line : null,
+    why: repeats ? null : why,
+    bought,
+    young: young ? `The domain is only ${facts.domainAgeDays} days old.` : null,
+  };
+  // Keep at most 3. The bought line, brand and reviews lines stay; the age line and the sentence go first.
+  const list = [lines.brand, lines.rep, lines.why, lines.bought, lines.young].filter((x): x is string => !!x);
+  for (const drop of [lines.young, lines.why]) { if (list.length > 3 && drop) list.splice(list.indexOf(drop), 1); }
+  return { verdict, reasons: list.slice(0, 3) };
 }

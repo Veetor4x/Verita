@@ -6,6 +6,7 @@ import type { Item } from './extract.js';
 import { checkLink } from './checks/link.js';
 import { checkClaim } from './checks/claim.js';
 import { checkAddress, checkTx } from './checks/payment.js';
+import { checkReviews } from './checks/reputation.js';
 
 async function cached(kind: CheckKind, input: string, buyIt: () => Promise<CheckResult>): Promise<CheckResult> {
   const hit = await findCachedCheck(kind, input);
@@ -28,5 +29,6 @@ export function runCheck(item: Item): Promise<CheckResult> {
     case 'CLAIM': return cached('CLAIM', item.value, () => checkClaim(item.value));
     case 'TX': return cached('PAYMENT', item.value, () => checkTx(item.value));
     case 'ADDRESS': return cached('PAYMENT', item.value, () => checkAddress(item.value));
+    case 'REVIEW': return cached('REVIEW', item.value, () => checkReviews(item.value));
   }
 }

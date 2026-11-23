@@ -49,7 +49,9 @@ export function resultPage(r: CheckResult): string {
 
   // Claims: Official Check line + up to 3 real source links returned by the miners.
   const links = (r.details.sourceLinks ?? []).slice(0, 3);
-  const claimExtra = r.kind !== 'CLAIM' ? '' : `
+  const claimExtra = r.kind === 'LINK' || r.kind === 'REVIEW'
+    ? (links.length ? `<p class="lbl">Review sources</p><ul class="srcs">${links.slice(0, 2).map((u) => `<li><a href="${esc(u)}" rel="noopener noreferrer" target="_blank">${esc(u)}</a></li>`).join('')}</ul>` : '')
+    : r.kind !== 'CLAIM' ? '' : `
   <p class="note"><strong>Official check:</strong> ${CLAIM_OFFICIAL_TEXT[r.officialCheck.status]}</p>
   ${links.length ? `<p class="lbl">Sources</p><ul class="srcs">${links.map((u) => `<li><a href="${esc(u)}" rel="noopener noreferrer" target="_blank">${esc(u)}</a></li>`).join('')}</ul>` : ''}`;
 

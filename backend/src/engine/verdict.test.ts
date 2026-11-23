@@ -126,3 +126,45 @@ test('brand + a paid flag: no repeated sentence, the bought line says how many f
   ]);
   assert.ok(r.reasons.every((x) => !/also flagged/.test(x)));
 });
+
+// ---- reputation (reviews / adverse news) ----
+const NONE = { state: 'none' as const, line: 'No reviews found — new or unknown sites are higher risk' };
+const SCAMREP = { state: 'scam' as const, line: 'Reviews: scam reports and adverse news found (Law360)' };
+
+test('no reviews never gives a lone 🟢: SAFE becomes CAREFUL with the exact reason', () => {
+  const r = linkVerdict([m('a', false), m('b', false)], { reputation: NONE }, 3);
+  assert.equal(r.verdict, 'CAREFUL');
+  assert.equal(r.reasons[0], 'No reviews found — new or unknown sites are higher risk');
+  assert.ok(r.reasons.every((x) => !/found no threat\.$/.test(x) || /checks? bought/.test(x)));
+  assert.equal(r.reasons.at(-1), "5 checks bought: 2 found no threat, 3 for reviews and news.");
+});
+test('popular sites skip the review check: no reputation, still 🟢', () => {
+  assert.equal(linkVerdict([m('a', false), m('b', false)], { popular: true }).verdict, 'SAFE');
+  assert.equal(linkVerdict([m('a', false), m('b', false)], { popular: true, reputation: NONE }).verdict, 'SAFE'); // even if one slipped in
+});
+test('positive reviews / a credible page: informational, 🟢 stays', () => {
+  const pos = linkVerdict([m('a', false), m('b', false)], { reputation: { state: 'positive', line: 'Reviews: generally positive' } }, 3);
+  assert.equal(pos.verdict, 'SAFE'); assert.equal(pos.reasons[0], 'Reviews: generally positive');
+  const pres = linkVerdict([m('a', false), m('b', false)], { reputation: { state: 'presence', line: 'Reviews: none found, but credible sources describe it (en.wikipedia.org)' } }, 3);
+  assert.equal(pres.verdict, 'SAFE');
+});
+test('scam reports count as one flag: alone 🟡, with a paid flag 🔴', () => {
+  assert.equal(linkVerdict([m('a', false), m('b', false)], { reputation: SCAMREP }, 3).verdict, 'CAREFUL');
+  assert.equal(linkVerdict([m('a', true), m('b', false)], { reputation: SCAMREP }, 3).verdict, 'SCAM');
+  assert.equal(linkVerdict([m('a', null), m('b', null)], { reputation: SCAMREP }, 3).verdict, 'CAREFUL'); // one kind of evidence only
+});
+test('brand + scam reports: two free flags against two clean scans is a tie (🟡); with a paid flag it is 🔴', () => {
+  assert.equal(linkVerdict([m('a', false), m('b', false)], { reputation: SCAMREP, brandImpersonation: brand }, 3).verdict, 'CAREFUL');
+  assert.equal(linkVerdict([m('a', true), m('b', false)], { reputation: SCAMREP, brandImpersonation: brand }, 3).verdict, 'SCAM');
+  assert.equal(linkVerdict([m('a', null), m('b', null)], { reputation: SCAMREP, brandImpersonation: brand }, 3).verdict, 'SCAM'); // 2 of 2 usable
+});
+test('at most 3 reasons, and the bought line + brand + reviews lines survive', () => {
+  const r = linkVerdict([m('a', true), m('b', false)], { reputation: { state: 'mixed', line: 'Reviews: mixed (some scam reports, some positive)' }, brandImpersonation: brand, domainAgeDays: 3 }, 3);
+  assert.ok(r.reasons.length <= 3);
+  assert.match(r.reasons[0], /Pretends to be PayPal/); assert.match(r.reasons[1], /^Reviews: mixed/); assert.match(r.reasons.at(-1)!, /checks bought/);
+});
+test('bought line counts review purchases too, so it matches the receipts', () => {
+  assert.equal(boughtLine([m('a', true), m('b', false)], 3), '5 checks bought: 1 flagged it, 1 found no threat, 3 for reviews and news.');
+  assert.equal(boughtLine([], 2), '2 checks bought: 2 for reviews and news.');
+  assert.equal(boughtLine([m('a', false)]), '1 check bought: 1 found no threat.'); // unchanged without reviews
+});

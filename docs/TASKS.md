@@ -65,6 +65,10 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 - 🔄 Official Check (FOUND / CLOSE / NOT_FOUND): links = brand list + "Official site" button (done); claims = "Found on official/credible sources" / "Something close found" / "Not found" (done, source links must relate to the claim); still todo: web-search part for links (WEB_SEARCH_GENERAL, VENDOR_VERIFY_GENERAL)
 - ⬜ Cache (24h per normalised input) and spend caps (per check + per day)
 
+## Nov 23 — Extra features (new features STOP after Nov 27)
+- ✅ Reputation / reviews (Nov 23): `Reviews:` line in every non-popular link check (+ up to 2 real links), `/reviews <name or site>` standalone. No review intent exists on Telegraph; built from an adverse-media miner (found by capability) + `WEB_SEARCH_GENERAL` "<domain> reviews" / "<domain> scam". "No reviews found" = one 🟡 reason, never a lone 🟢; popular sites skip it. Results and the plausible.io false-accusation fix in docs/REVIEW_TESTS.md. **Trade-off: legit small sites now end 🟡; link checks cost ~$0.07**
+- 🔄 Images / screenshots (next). Findings so far: Telegraph rejects requests over 16 KB (no base64); no extraction miner can read text in an image; most image-verification miners are stubs
+
 ## Nov 24–25 — Web pages
 - ⬜ `/` paste box + explainer
 - ✅ `/c/:id` verdict card + "More details" (miners, cost, receipts): mobile-first redesign (Nov 18), dark mode, tap-to-verify hashes, "Official site" button
