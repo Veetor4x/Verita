@@ -11,6 +11,7 @@ const TITLES = {
   CLAIM: { SAFE: '🟢 Confirmed true', CAREFUL: '🟡 Unverified or mixed', SCAM: '🔴 Likely false' },
   PAYMENT: { SAFE: '🟢 Looks fine', CAREFUL: '🟡 Be careful', SCAM: '🔴 High risk' },
   REVIEW: { SAFE: '🟢 Reviews look good', CAREFUL: '🟡 Reputation unclear', SCAM: '🔴 Scam reports found' },
+  IMAGE: { SAFE: '🟢 Nothing risky in this image', CAREFUL: '🟡 Be careful with this image', SCAM: '🔴 Risky content in this image' },
 } as const;
 export const titleOf = (r: Pick<CheckResult, 'kind' | 'verdict'>) => TITLES[r.kind][r.verdict];
 
@@ -36,11 +37,12 @@ export function formatResult(r: CheckResult): string {
   const cost = `$${r.details.totalCostUsd.toFixed(2)}`;
   const subject =
     r.kind === 'CLAIM' ? `<i>“${esc(r.input.slice(0, 200))}${r.input.length > 200 ? '…' : ''}”</i>`
+    : r.kind === 'IMAGE' ? '<i>🖼 Image</i>'
     : r.kind === 'PAYMENT' ? `<code>${esc(shortenHex(r.input))}</code>`
     : `<code>${esc(r.input.slice(0, 200))}</code>`;
 
   const lines = [`<b>${titleOf(r)}</b>`, subject, ''];
-  if (r.kind === 'PAYMENT' && r.details.facts?.length) {
+  if ((r.kind === 'PAYMENT' || r.kind === 'IMAGE') && r.details.facts?.length) {
     for (const f of r.details.facts) if (f.label !== 'Token contract') lines.push(`<b>${esc(f.label)}:</b> ${esc(shortenHex(f.value))}`);
     lines.push('');
   }
