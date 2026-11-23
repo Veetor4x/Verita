@@ -89,9 +89,9 @@ test('lookalike: a page about the REAL brand does not count for a phishing domai
   assert.equal(assessReputation(entityFrom('http://metamask-wallet-verify.xyz/connect'), [web('metamask-wallet-verify.xyz reviews', 'MetaMask', ['https://en.wikipedia.org/wiki/MetaMask'])]).state, 'none');
 });
 
-test('none: the exact line from the brief (sites vs businesses)', () => {
-  assert.equal(assessReputation(entityFrom('example-shop.xyz'), []).line, 'No reviews found — new or unknown sites are higher risk');
-  assert.equal(assessReputation(entityFrom('Acme Plumbing Ltd'), []).line, 'No reviews found — new or unknown businesses are higher risk');
+test('none: a neutral info line, same for sites and businesses', () => {
+  assert.equal(assessReputation(entityFrom('example-shop.xyz'), []).line, 'Reviews: none found.');
+  assert.equal(assessReputation(entityFrom('Acme Plumbing Ltd'), []).line, 'Reviews: none found.');
 });
 test('links: max 2, only URLs the miners returned, credible first, junk rejected', () => {
   const e = entityFrom('bitconnect.co');
