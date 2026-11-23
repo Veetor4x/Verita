@@ -93,12 +93,14 @@ export type ImageSummaryInput = {
 
 const KIND_WORD: Record<string, [string, string]> = { LINK: ['link', 'links'], TX: ['transaction', 'transactions'], ADDRESS: ['address', 'addresses'], CLAIM: ['claim', 'claims'] };
 
+export const NO_TEXT_LINE = 'We could not read any text in this image, so there is nothing to check.';
+
 /** What was found, e.g. "Found in the image: 1 link, 1 address." Counts come from the items we really checked. */
 export function foundLine(items: CheckResult[], kinds: ('LINK' | 'TX' | 'ADDRESS' | 'CLAIM')[]): string {
   const counts = new Map<string, number>();
   for (const k of kinds) counts.set(k, (counts.get(k) ?? 0) + 1);
   const parts = [...counts].map(([k, n]) => `${n} ${KIND_WORD[k][n === 1 ? 0 : 1]}`);
-  return parts.length ? `Found in the image: ${parts.join(', ')}.` : 'We could not read any text in this image, so there is nothing to check.';
+  return parts.length ? `Found in the image: ${parts.join(', ')}.` : NO_TEXT_LINE;
 }
 
 /** Verdict and reasons (max 3) for the image as a whole. Worst item decides; a doubtful image is at most 🟡. */

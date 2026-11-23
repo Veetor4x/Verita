@@ -67,7 +67,9 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 
 ## Nov 23 — Extra features (new features STOP after Nov 27)
 - ✅ Reputation / reviews (Nov 23): `Reviews:` line in every non-popular link check (+ up to 2 real links), `/reviews <name or site>` standalone. No review intent exists on Telegraph; built from an adverse-media miner (found by capability) + `WEB_SEARCH_GENERAL` "<domain> reviews" / "<domain> scam". "No reviews found" = one 🟡 reason, never a lone 🟢; popular sites skip it. Results and the plausible.io false-accusation fix in docs/REVIEW_TESTS.md. **Trade-off: legit small sites now end 🟡; link checks cost ~$0.07**
-- 🔄 Images / screenshots (next). Findings so far: Telegraph rejects requests over 16 KB (no base64); no extraction miner can read text in an image; most image-verification miners are stubs
+- ✅ Images / screenshots (Nov 23): DM photo or image file (group: reply `/check`, or a photo captioned `/check`). Text read by **local OCR** (tesseract.js; no Telegraph miner can read an image), then the normal link / claim / payment checks run on what is found, worst first. Two forensic purchases (IMAGE_VERIFICATION, DEEPFAKE) on a short-lived re-hosted URL (`/i/<id>`, never the Telegram file URL). Videos: "Video checks are coming soon. Send a screenshot instead." Details, results and limits in docs/IMAGE_TESTS.md. **Known: forensic miners only answer "Inconclusive" so the "may be edited or AI-generated" reason has never fired live; not tested through real Telegram yet (first thing to try: send the bot a screenshot); `IMAGE_FORENSICS=off` disables the forensic purchases**
+
+- ⬜ **Escrow top-up needed:** escrow was down to about $0.3 at the end of Nov 23 (the live bot uses it). Run `NODE_USE_ENV_PROXY=1 node --disable-warning=ExperimentalWarning backend/scripts/deposit-escrow.mjs 5` (my attempt was blocked by a permission check)
 
 ## Nov 24–25 — Web pages
 - ⬜ `/` paste box + explainer

@@ -1,7 +1,7 @@
 // Drives the real bot with fake Telegram updates and a fake check runner: no network, no money.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createBot, VIDEO_SOON, type ImageDeps } from './index.js';
+import { createBot, READING_IMAGE, VIDEO_SOON, type ImageDeps } from './index.js';
 import { safeError } from './telegramFile.js';
 import { ImageError } from '../engine/checks/image.js';
 import type { Item } from '../engine/extract.js';
@@ -109,14 +109,16 @@ test('DM: a photo is downloaded (biggest size), analysed, saved, and answered', 
   assert.deepEqual(calls.downloaded, ['big']);
   assert.deepEqual(calls.analysed, [{ size: 16, caption: 'is this real?' }]);
   assert.deepEqual(calls.saved, ['img12345']);
-  assert.match(replies[0], /Image/);
+  assert.equal(replies[0], READING_IMAGE); // acknowledged right away: the real answer can take a minute
+  assert.match(replies[1], /Image/);
 });
 test('DM: the summary comes first, then each thing found (worst first order is kept)', async () => {
   const items = [{ ...result({ kind: 'LINK', value: 'http://bad.xyz' }), verdict: 'SCAM' as const }, { ...result({ kind: 'CLAIM', value: 'a claim here now' }), verdict: 'CAREFUL' as const }];
   const { deps } = fakeImages({ items });
   const { replies } = await drive(photoMsg(), 'private', deps);
-  assert.equal(replies.length, 3);
-  assert.match(replies[0], /Image/); assert.match(replies[1], /Likely scam/); assert.match(replies[2], /Unverified/);
+  assert.equal(replies.length, 4);
+  assert.equal(replies[0], READING_IMAGE);
+  assert.match(replies[1], /Image/); assert.match(replies[2], /Likely scam/); assert.match(replies[3], /Unverified/);
 });
 test('DM: an image sent as a file is checked; a PDF or other file is ignored', async () => {
   const a = fakeImages();
@@ -163,11 +165,12 @@ test('VIDEO: DM gets the exact coming-soon reply; a group stays silent; /check o
 
 test('download problems give a plain message and never mention a URL or the bot token', async () => {
   const tooBig = fakeImages({ failDownload: new ImageError('That image is too large (max 5 MB).') });
-  assert.deepEqual((await drive(photoMsg(), 'private', tooBig.deps)).replies, ['That image is too large (max 5 MB).']);
+  assert.deepEqual((await drive(photoMsg(), 'private', tooBig.deps)).replies, [READING_IMAGE, 'That image is too large (max 5 MB).']);
   const leaky = fakeImages({ failDownload: new Error('fetch failed: https://api.telegram.org/file/bot123:TEST/photos/file_1.jpg') });
   const { replies } = await drive(photoMsg(), 'private', leaky.deps);
-  assert.equal(replies.length, 1);
-  assert.ok(!/123:TEST|api\.telegram\.org|file\/bot/.test(replies[0]), replies[0]);
+  assert.equal(replies.length, 2);
+  assert.ok(replies.every((r) => !/123:TEST|api\.telegram\.org|file\/bot/.test(r)), replies.join(' | '));
+  assert.match(replies[1], /Sorry, I could not check that image/); // generic wording for unexpected errors
 });
 
 test('safeError strips the token from anything that gets logged', () => {
@@ -176,4 +179,12 @@ test('safeError strips the token from anything that gets logged', () => {
   const s = safeError(e, token);
   assert.ok(!s.includes(token) && !s.includes('ABC-secret'), s);
   assert.ok(!/file\/bot[0-9]/.test(s), s);
+});
+
+test('titles: a plain photo with no text is "No text to check", not a warning; real findings keep their titles', async () => {
+  const { titleOf } = await import('./format.js');
+  const { NO_TEXT_LINE } = await import('../engine/image.js');
+  assert.equal(titleOf({ kind: 'IMAGE', verdict: 'CAREFUL', reasons: [NO_TEXT_LINE, '2 checks bought on the image itself: image verification, deepfake check.'] }), '🟡 No text to check in this image');
+  assert.equal(titleOf({ kind: 'IMAGE', verdict: 'CAREFUL', reasons: ['Found in the image: 1 link.'] }), '🟡 Be careful with this image');
+  assert.equal(titleOf({ kind: 'IMAGE', verdict: 'SCAM', reasons: [NO_TEXT_LINE] }), '🔴 Risky content in this image');
 });

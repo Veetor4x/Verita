@@ -9,6 +9,8 @@ export const config = {
   maxSpendPerDayUsd: num(process.env.MAX_SPEND_PER_DAY_USD, 3.0),
   // Bump this date whenever verdict rules change: older cached verdicts are ignored (they used the old rules).
   cacheValidFrom: '2026-11-23T18:28:00Z',
+  // IMAGE_FORENSICS=off: do not buy forensic checks on images (no image is ever hosted for miners). Text is still read locally.
+  imageForensics: process.env.IMAGE_FORENSICS !== 'off',
   cacheTtlHours: num(process.env.CACHE_TTL_HOURS, 24),
   publicUrl: (process.env.PUBLIC_URL || '').replace(/\/$/, ''),
   telegramToken: process.env.TELEGRAM_BOT_TOKEN || '',

@@ -29,6 +29,7 @@ const WELCOME =
   '(Group admins: turn off the bot\'s privacy mode in BotFather: /setprivacy → Disable.)';
 
 export const VIDEO_SOON = 'Video checks are coming soon. Send a screenshot instead.';
+export const READING_IMAGE = '🔎 Reading the image and checking what is in it. This can take up to a minute.';
 
 // Simple per-user rate limit: 20 checks / minute.
 const hits = new Map<number, number[]>();
@@ -107,7 +108,7 @@ export function createBot(token: string, run: Runner = runCheck, botConfig?: Bot
   const bot = new Bot(token, botConfig);
   const images: ImageDeps = imageDeps ?? {
     download: (fileId) => downloadTelegramFile(bot.api, token, fileId),
-    analyse: (buf, caption) => analyseImage(buf, { run, publicUrl: config.publicUrl, caption }),
+    analyse: (buf, caption) => analyseImage(buf, { run, publicUrl: config.imageForensics ? config.publicUrl : undefined, caption }),
     save: saveCheck,
   };
 
@@ -116,6 +117,7 @@ export function createBot(token: string, run: Runner = runCheck, botConfig?: Bot
     if (ctx.from && limited(ctx.from.id)) { await ctx.reply('Slow down a little, try again in a minute.'); return; }
     const opts = replyOpts(replyTo);
     await ctx.replyWithChatAction('typing').catch(() => {});
+    await ctx.reply(READING_IMAGE, { reply_parameters: opts.reply_parameters }).catch(() => {}); // the first answer can take a while
     try {
       const buf = await images.download(fileId);
       const { summary, items } = await images.analyse(buf, caption);

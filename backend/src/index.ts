@@ -5,7 +5,7 @@ import { config } from './config.js';
 import { migrate, getCheck, getStats } from './db/index.js';
 import { createBot } from './bot/index.js';
 import { resultPage, statsPage } from './web/pages.js';
-import { getHosted } from './engine/imagehost.js';
+import { serveHostedImage } from './web/imageRoute.js';
 
 process.on('unhandledRejection', (e) => console.error('unhandled:', (e as Error)?.message ?? e));
 
@@ -17,12 +17,7 @@ app.use(express.static(fileURLToPath(new URL('./web/public', import.meta.url))))
 app.get('/health', (_req, res) => { res.json({ ok: true }); });
 
 // A checked image, hosted for about a minute so forensic miners can fetch it (see engine/imagehost.ts).
-// Unguessable name, memory only, never cached or indexed.
-app.get('/i/:name', (req, res) => {
-  const h = getHosted(req.params.name);
-  if (!h) { res.status(404).type('text').send('Not found'); return; }
-  res.set({ 'Content-Type': h.mime, 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'inline' }).send(h.buf);
-});
+app.get('/i/:name', serveHostedImage);
 
 app.get('/api/check/:id', async (req, res) => {
   const r = await getCheck(req.params.id).catch(() => null);
