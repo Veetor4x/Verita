@@ -59,6 +59,13 @@ export async function minersWithEndpoint(intent: string, path: string): Promise<
   } catch { return new Set(); }
 }
 
+/** Ids of miners whose name/slug/description matches (e.g. /adverse media/). Found by what they do, never by a fixed id. */
+export async function minersMatching(intent: string, re: RegExp): Promise<Set<string>> {
+  try {
+    return new Set((await apiMiners(intent)).filter((m) => re.test(`${m.name ?? ''} ${m.slug ?? ''} ${m.description ?? ''}`)).map((m) => String(m.id)));
+  } catch { return new Set(); }
+}
+
 const scoreCache = new Map<string, { at: number; rows: Ranked[] }>();
 async function scoresFor(intent: string): Promise<Ranked[]> {
   const hit = scoreCache.get(intent);

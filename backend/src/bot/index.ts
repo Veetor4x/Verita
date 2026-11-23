@@ -4,6 +4,7 @@
 //    someone replies to the message with /check. Normal chat is never auto-checked.
 import { Bot, InlineKeyboard, type BotConfig, type Context } from 'grammy';
 import { classify, extractLinks, type Item } from '../engine/extract.js';
+import { entityFrom } from '../engine/reputation.js';
 import { runCheck } from '../engine/run.js';
 import { formatResult } from './format.js';
 import { config } from '../config.js';
@@ -13,7 +14,8 @@ const WELCOME =
   '<b>Verità</b> checks if something is legit before you act on it.\n\n' +
   '• Send or forward a <b>link</b>: I check if it is a scam.\n' +
   '• Send a <b>transaction hash</b> or <b>wallet address</b> (0x…): I show the network, wallet or contract, amount and status.\n' +
-  '• Send a <b>news claim or message</b>: I fact-check it.\n\n' +
+  '• Send a <b>news claim or message</b>: I fact-check it.\n' +
+  '• <code>/reviews name or website</code>: what reviews and the news say about a business or site.\n\n' +
   'In a group, I check every link posted. For anything else, reply to the message with /check.\n' +
   '(Group admins: turn off the bot\'s privacy mode in BotFather: /setprivacy → Disable.)';
 
@@ -68,6 +70,19 @@ export function createBot(token: string, run: Runner = runCheck, botConfig?: Bot
     const items = classify(text);
     if (items.length === 0) { await ctx.reply('I could not find a link, transaction, address or claim to check in that message.', { reply_parameters: { message_id: replyTo, allow_sending_without_reply: true } }); return; }
     await answer(ctx, items, replyTo, run);
+  });
+
+  // /reviews <business name or website>, or reply to a message with /reviews.
+  bot.command('reviews', async (ctx) => {
+    const replied = ctx.message?.reply_to_message;
+    const source = (typeof ctx.match === 'string' && ctx.match.trim()) || replied?.text || replied?.caption || '';
+    const replyTo = replied?.message_id ?? ctx.message!.message_id;
+    // A link in the text means "the site"; otherwise the text itself is the business name.
+    const link = extractLinks(source.slice(0, 4000), 1)[0];
+    const entity = entityFrom(link ?? source.replace(/\s+/g, ' ').trim().slice(0, 120));
+    const subject = entity.domain ?? entity.name;
+    if (subject.length < 3) { await ctx.reply('Send /reviews followed by a business name or a website, for example /reviews example.com', { reply_parameters: { message_id: ctx.message!.message_id } }); return; }
+    await answer(ctx, [{ kind: 'REVIEW', value: subject }], replyTo, run);
   });
 
   bot.on(['message:text', 'message:caption'], async (ctx) => {

@@ -10,6 +10,7 @@ const TITLES = {
   LINK: { SAFE: '🟢 Looks safe', CAREFUL: '🟡 Be careful', SCAM: '🔴 Likely scam' },
   CLAIM: { SAFE: '🟢 Confirmed true', CAREFUL: '🟡 Unverified or mixed', SCAM: '🔴 Likely false' },
   PAYMENT: { SAFE: '🟢 Looks fine', CAREFUL: '🟡 Be careful', SCAM: '🔴 High risk' },
+  REVIEW: { SAFE: '🟢 Reviews look good', CAREFUL: '🟡 Reputation unclear', SCAM: '🔴 Scam reports found' },
 } as const;
 export const titleOf = (r: Pick<CheckResult, 'kind' | 'verdict'>) => TITLES[r.kind][r.verdict];
 
@@ -47,6 +48,10 @@ export function formatResult(r: CheckResult): string {
   if (r.kind === 'CLAIM') {
     lines.push('', `🏛 <b>Official check:</b> ${CLAIM_OFFICIAL_TEXT[r.officialCheck.status]}`);
     for (const u of (r.details.sourceLinks ?? []).slice(0, 3)) lines.push(`🔗 <a href="${attr(u)}">${esc(linkLabel(u))}</a>`);
+  } else if ((r.kind === 'LINK' || r.kind === 'REVIEW') && r.details.sourceLinks?.length) {
+    // Review / news sources the miners returned (real URLs only).
+    lines.push('');
+    for (const u of r.details.sourceLinks.slice(0, 2)) lines.push(`🔗 <a href="${attr(u)}">${esc(linkLabel(u))}</a>`);
   }
   lines.push(
     '',

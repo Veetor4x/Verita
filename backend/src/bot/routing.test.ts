@@ -9,7 +9,7 @@ const TX = '0x3cdb78fd28dd818281b08abd4f9c42aaf7de9624fbb37d95bdb3151e7cca2ac6';
 const ADDR = '0x98B19CA45dc94C94ea5053a516c69D2b04312519';
 
 function result(item: Item): CheckResult {
-  return { id: 'abc12345', kind: item.kind === 'LINK' ? 'LINK' : item.kind === 'CLAIM' ? 'CLAIM' : 'PAYMENT', input: item.value, verdict: 'CAREFUL', reasons: ['test'],
+  return { id: 'abc12345', kind: item.kind === 'LINK' ? 'LINK' : item.kind === 'CLAIM' ? 'CLAIM' : item.kind === 'REVIEW' ? 'REVIEW' : 'PAYMENT', input: item.value, verdict: 'CAREFUL', reasons: ['test'],
     officialCheck: { status: 'NOT_FOUND', links: [] }, details: { sources: [], miners: [], receipts: [], totalCostUsd: 0, cached: false }, createdAt: 0 };
 }
 
@@ -69,4 +69,20 @@ test('/check <text> works in a DM too', async () => {
 test('replies are HTML messages with the disclaimer', async () => {
   const { replies } = await drive({ text: 'Bitcoin has a maximum supply of 21 million coins.' });
   assert.match(replies[0], /Always confirm on official channels before acting/);
+});
+
+test('/reviews <business name> and /reviews <website> run a REVIEW check on the name / domain', async () => {
+  const a = await drive(cmd('/reviews Acme Plumbing Ltd'));
+  assert.deepEqual(a.ran, [{ kind: 'REVIEW', value: 'Acme Plumbing Ltd' }]);
+  const b = await drive(cmd('/reviews https://www.Example-Shop.com/path?x=1'));
+  assert.deepEqual(b.ran, [{ kind: 'REVIEW', value: 'example-shop.com' }]);
+});
+test('GROUP: /reviews as a reply uses the replied message; with nothing it explains usage and buys nothing', async () => {
+  const reply = (text: string) => ({ ...cmd('/reviews'), reply_to_message: { message_id: 7, date: 0, chat: { id: 1, type: 'supergroup', title: 'g' }, text } });
+  assert.deepEqual((await drive(reply('check out http://binance-airdrop-claim.top/ now'), 'supergroup')).ran, [{ kind: 'REVIEW', value: 'binance-airdrop-claim.top' }]);
+  const none = await drive(cmd('/reviews'), 'supergroup');
+  assert.equal(none.ran.length, 0); assert.match(none.replies[0], /\/reviews/);
+});
+test('plain DM text is never a /reviews check (no accidental purchases)', async () => {
+  assert.equal((await drive({ text: 'is Acme Plumbing Ltd any good?' })).ran.every((i) => i.kind !== 'REVIEW'), true);
 });

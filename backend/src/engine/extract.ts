@@ -26,7 +26,8 @@ export function extractAddresses(text: string, max = 5): string[] {
   return [...seen.values()].slice(0, max);
 }
 
-export type Item = { kind: 'LINK' | 'TX' | 'ADDRESS' | 'CLAIM'; value: string };
+/** REVIEW is never produced by classify(): it comes only from the /reviews command. */
+export type Item = { kind: 'LINK' | 'TX' | 'ADDRESS' | 'CLAIM' | 'REVIEW'; value: string };
 
 export const MAX_ITEMS = 5;
 export const MAX_CLAIM_CHARS = 500;
