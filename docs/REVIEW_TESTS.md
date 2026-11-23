@@ -8,7 +8,7 @@ Run: `NODE_USE_ENV_PROXY=1 npx tsx backend/scripts/review-suite.mjs [--link-only
 - **Never invents anything.** Every link and source name shown was returned by a miner. No rating is shown unless the answer literally contains one ("4.8/5").
 - **Verdict effects (links):**
   - scam reports about the site = **one flag** (like the brand check), so with one paid flag it becomes 🔴, alone it stays 🟡;
-  - **"No reviews found — new or unknown sites are higher risk" = one 🟡 reason; a link that would be 🟢 becomes 🟡.** Never 🟢 on its own. Popular sites skip the whole review check;
+  - **"Reviews: none found." is a neutral info line only (changed Nov 23, evening).** It never changes the verdict by itself. Every real warning sign (a flag, disagreement, too few answers, a very new domain, a brand look-alike) already gives 🟡 on its own, so "none found" only ever appears next to them. Popular sites skip the whole review check;
   - "generally positive", "mixed" and "none found, but credible sources describe it" are information only.
 - **Standalone verdict:** 🔴 only with two independent kinds of evidence, 🟡 with one or none, 🟢 only if the text found is positive.
 - **Cost:** 3 purchases (~$0.03). A non-popular link check is now ~$0.07 (was ~$0.04); the "N checks bought" line counts them ("7 checks bought: 2 found no threat, 2 couldn't check this link, 3 for reviews and news").
@@ -31,15 +31,17 @@ Run: `NODE_USE_ENV_PROXY=1 npx tsx backend/scripts/review-suite.mjs [--link-only
 | Scam | bitconnect.co | 🟡 | 🟡 | "scam reports and adverse news found (Law360, TradingView, India Today)" + Wikipedia *Bitconnect* link. Only one kind of evidence, so not 🔴 |
 | Scam | onecoin.eu | 🟡 | 🟡 | "No reviews found": **a miss** (OneCoin is a notorious scam; no miner knows the domain) |
 | Scam | paypa1-secure-login.verify-account.xyz | 🔴 | 🟡 | "No reviews found"; the 🔴 comes from the brand check (PayPal) + a paid flag |
-| Small legit | plausible.io | 🟡 | 🟡 | none found, but credible sources describe it (Wikipedia *Plausible Analytics*) in the standalone run; "No reviews found" in the link run (the search answers differ per run). **No false accusation** |
+| Small legit | plausible.io | 🟡* | 🟡 | none found, but credible sources describe it (Wikipedia *Plausible Analytics*) in the standalone run; "No reviews found" in the link run (the search answers differ per run). **No false accusation** |
 | Small legit | pinboard.in | 🟡 | 🟡 | "No reviews found" |
 | Small legit | buttondown.com | 🟡 | 🟡 | "No reviews found" |
 | Popular | google.com, github.com, wikipedia.org | 🟢 | n/a | skipped on purpose: $0.02 each, no review purchases |
 
 Scorecard: popular sites 3/3 🟢 and unchanged in cost. Scam domains: 1 of 3 shows real scam reports (BitConnect), 1 is 🔴 via the brand check, 1 is a miss. Legit small sites: **0 of 3 reach 🟢 any more** (all 🟡), and none is accused.
 
+## Softer rule (Nov 23, evening)
+\* The table above is the run with the **old** rule ("no reviews" made a clean link 🟡). With the new neutral rule the three small legit sites, whose scans were all clean (4 of 4 found no threat), would be 🟢 with the line "Reviews: none found." I did not re-run them live (credit); the rule is covered by unit tests (clean scans + none found = 🟢; any real warning sign = 🟡 with or without it). The standalone `/reviews` check still ends 🟡 "Reputation unclear" when nothing is found, because reputation is the only question there.
+
 ## Known limits and trade-offs (read before the demo)
-- **Legit small sites and businesses now end 🟡 ("No reviews found").** That is the rule you asked for, and it is honest, but it is a new source of mild false alarms: Telegraph simply has no review data, so almost every small site has "no reviews". The standalone `/reviews` check is less affected (it only says "none found").
+- **A site with no online presence at all now gets 🟢 if both scans are clean.** Telegraph has almost no review data, so "none found" says little either way; the scans and the brand / age / flag checks are what protect the user.
 - Review quality is limited by the miners: no star ratings, no review-site links in practice. The adverse-media miner only knows large news outlets, so most scams are not found.
 - The result varies a little between runs because routed searches reach different miners.
-- If you want the "no reviews" rule softer (e.g. information only for sites that already have two clean scans), it is one line in `linkVerdict`.

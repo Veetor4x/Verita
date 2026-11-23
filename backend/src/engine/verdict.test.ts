@@ -128,15 +128,19 @@ test('brand + a paid flag: no repeated sentence, the bought line says how many f
 });
 
 // ---- reputation (reviews / adverse news) ----
-const NONE = { state: 'none' as const, line: 'No reviews found — new or unknown sites are higher risk' };
+const NONE = { state: 'none' as const, line: 'Reviews: none found.' };
 const SCAMREP = { state: 'scam' as const, line: 'Reviews: scam reports and adverse news found (Law360)' };
 
-test('no reviews never gives a lone 🟢: SAFE becomes CAREFUL with the exact reason', () => {
+test('no reviews is neutral info only: it never changes the verdict', () => {
   const r = linkVerdict([m('a', false), m('b', false)], { reputation: NONE }, 3);
-  assert.equal(r.verdict, 'CAREFUL');
-  assert.equal(r.reasons[0], 'No reviews found — new or unknown sites are higher risk');
-  assert.ok(r.reasons.every((x) => !/found no threat\.$/.test(x) || /checks? bought/.test(x)));
-  assert.equal(r.reasons.at(-1), "5 checks bought: 2 found no threat, 3 for reviews and news.");
+  assert.equal(r.verdict, 'SAFE'); assert.ok(r.reasons.includes('Reviews: none found.'));
+  assert.equal(r.reasons.at(-1), '5 checks bought: 2 found no threat, 3 for reviews and news.');
+  // real warning signs are 🟡 with or without it
+  assert.equal(linkVerdict([m('a', false), m('b', null)], { reputation: NONE }, 3).verdict, 'CAREFUL'); // too few answers
+  assert.equal(linkVerdict([m('a', false), m('b', false)], { reputation: NONE, domainAgeDays: 3 }, 3).verdict, 'CAREFUL'); // new domain
+  assert.equal(linkVerdict([m('a', false), m('b', false)], { reputation: NONE, brandImpersonation: brand }, 3).verdict, 'CAREFUL'); // look-alike
+  assert.equal(linkVerdict([m('a', true), m('b', false)], { reputation: NONE }, 3).verdict, 'CAREFUL'); // disagreement
+  assert.equal(linkVerdict([m('a', true), m('b', true)], { reputation: NONE }, 3).verdict, 'SCAM');
 });
 test('popular sites skip the review check: no reputation, still 🟢', () => {
   assert.equal(linkVerdict([m('a', false), m('b', false)], { popular: true }).verdict, 'SAFE');

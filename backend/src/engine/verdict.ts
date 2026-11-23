@@ -16,7 +16,7 @@ export type LinkFacts = {
   brandImpersonation?: { brand: string; officialDomain: string };
   /**
    * What reviews / adverse news say (reputation.ts). Not set for popular sites (skipped).
-   * 'scam' counts as ONE flag; 'none' stops a lone 🟢 (unknown is not safe); the others are information.
+   * 'scam' counts as ONE flag; the others (positive, mixed, presence, none) are information only.
    */
   reputation?: { state: 'scam' | 'positive' | 'mixed' | 'presence' | 'none'; line: string };
 };
@@ -94,8 +94,8 @@ export function boughtLine(bought: Signal[], reviewChecks = 0): string {
  *     more than half flag -> 🔴 | nobody flags -> 🟢 | anything in between (incl. ties) -> 🟡.
  * - Fewer than 2 independent usable answers and nobody flagged: 🟡 (unknown is not safe).
  * - Brand impersonation (brands.ts) and scam reports in reviews/news (reputation.ts) each count as one extra flag.
- * - "No reviews found" never gives a 🟢 on its own: a 🟢 becomes 🟡 with the reason "No reviews found — new or unknown
- *   sites are higher risk". (Popular sites skip the review check.)
+ * - "No reviews found" is a neutral info line only. It never changes the verdict by itself: every real warning sign
+ *   (flag, disagreement, too few answers, new domain, brand look-alike) already gives 🟡 on its own. Popular sites skip it.
  *
  * Reasons (max 3): brand line, reviews line, one number-free sentence explaining the verdict,
  * then the "N checks bought: ..." line built from what was actually purchased (`reviewChecks` = review purchases).
@@ -139,10 +139,6 @@ export function linkVerdict(miners: Signal[], facts: LinkFacts = {}, reviewCheck
   } else if (young) {
     verdict = 'CAREFUL';
     why = 'The checks found no threat, but the domain is very new.';
-  } else if (rep?.state === 'none') {
-    // The scans found nothing, but nobody has anything to say about this site either: that is not a reason for 🟢.
-    verdict = 'CAREFUL';
-    why = null; // the "No reviews found" line is the reason
   } else {
     verdict = 'SAFE';
     why = 'Independent sources found no threat.';

@@ -84,7 +84,7 @@ export type Reputation = {
   scamSignals: number;
 };
 
-export const NO_REVIEWS_LINE = (e: Entity) => `No reviews found — new or unknown ${e.domain ? 'sites' : 'businesses'} are higher risk`;
+export const NO_REVIEWS_LINE = 'Reviews: none found.'; // neutral information, not a warning
 
 export function assessReputation(e: Entity, answers: RepAnswer[]): Reputation {
   let adverse = false; let webScam = false; let webPositive = false; let rating: string | null = null;
@@ -123,5 +123,5 @@ export function assessReputation(e: Entity, answers: RepAnswer[]): Reputation {
     let host = credible[0]; try { host = new URL(credible[0]).hostname.replace(/^www\./, ''); } catch { /* keep */ }
     return { state: 'presence', line: `Reviews: none found, but credible sources describe it (${host})`, links: credible.slice(0, 2), scamSignals };
   }
-  return { state: 'none', line: NO_REVIEWS_LINE(e), links: [], scamSignals };
+  return { state: 'none', line: NO_REVIEWS_LINE, links: [], scamSignals };
 }
