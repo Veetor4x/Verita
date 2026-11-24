@@ -112,3 +112,13 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 ## Open risks / admin
 - ⬜ Update hackathon team registration to solo ("one team, one identity")
 - ⬜ Confirm payout eligibility for Nigeria with organisers
+
+
+## Nov 24: new reply style + fixes
+- Bot replies rewritten (`bot/simple.ts`): plain words, max 3 lines, no code text, risky links shown broken (`site[.]xyz`), warning line only on 🔴/🟡, no counts/cost/escalation text (all kept on /c/:id and /stats), one message per check (the "Checking…" note is edited into the answer), images = one combined reply, worst first.
+- Reviews: silent if none; "Read reviews" / "Read sources" button lists sites (needs `callback_query` in webhook allowed_updates).
+- Address look-alike is now 🔴 inside the main reply.
+- Images: sharp preprocessing + word repair before OCR; links from images show the domain only.
+- Payment: tries several lookup miners (rich /check-tx miner at any rank); a mined tx with no receipt is no longer "pending".
+- Official site button only for CLOSE matches.
+- Not yet tested through real Telegram: photo flow, "Read reviews" buttons, edit-in-place.

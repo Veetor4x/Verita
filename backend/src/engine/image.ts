@@ -37,9 +37,68 @@ export function repairWrappedUrls(text: string): string {
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+/** Break a link so it can not be tapped: metamask-wallet-verify[.]xyz (domain only, no path, no scheme). */
+export function defangDomain(input: string): string {
+  let host = input.trim();
+  try { host = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(host) ? host : 'https://' + host).hostname; } catch { /* use as is */ }
+  return host.replace(/^www\./i, '').toLowerCase().replace(/\./g, '[.]');
+}
+
+// ---- repairing OCR noise inside links ----
+import { BRANDS } from './brands.js';
+
+/** Words that appear in scam domains, and brand names. A garbled word near one of these is corrected. */
+const VOCAB = [...new Set([
+  ...BRANDS.flatMap((b) => b.keywords),
+  'connect', 'wallet', 'verify', 'secure', 'login', 'signin', 'claim', 'airdrop', 'giveaway', 'reward', 'rewards', 'support', 'account',
+  'update', 'bonus', 'official', 'recovery', 'validate', 'confirm', 'security', 'crypto', 'bitcoin', 'ethereum', 'invest', 'trading',
+  'exchange', 'payment', 'refund', 'unlock', 'suspended', 'authentication', 'helpdesk', 'staking', 'withdraw', 'migration',
+])];
+
+function editDistance(a: string, b: string): number {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+
+/** One word of a domain: leave real words alone, fix a word that is 1 edit (2 if long) away from a vocabulary word. */
+export function fixWord(w: string): string {
+  const lw = w.toLowerCase();
+  if (lw.length < 6 || VOCAB.includes(lw) || /\d/.test(lw)) return w;
+  const max = lw.length >= 8 ? 2 : 1;
+  let best: string | null = null; let bestD = max + 1;
+  for (const v of VOCAB) {
+    if (Math.abs(v.length - lw.length) > max || v[0] !== lw[0]) continue;
+    const dist = editDistance(lw, v);
+    if (dist < bestD) { best = v; bestD = dist; }
+  }
+  return best ?? w;
+}
+
+const URLISH = /(?:https?:\/\/|www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?:\/[^\s]*)?/gi;
+/**
+ * Clean the links in OCR text: "http:/ /", "h ttp", spaces inside a link, then fix garbled words in the host
+ * ("conmnecit" -> "connect"). Only link-shaped text is touched, never normal sentences.
+ */
+export function fixOcrUrls(text: string): string {
+  const spaced = text
+    .replace(/\bh\s*t\s*t\s*p(s?)\s*:\s*\/\s*\/?\s*/gi, (_m, s) => `http${s}://`)
+    .replace(/(https?:\/\/[^\s]*?)\s*([.-])\s*(?=[a-z0-9])/gi, '$1$2');
+  return spaced.replace(URLISH, (token) => {
+    const m = /^(https?:\/\/|www\.)?([^/\s]+)(.*)$/i.exec(token);
+    if (!m) return token;
+    const [, scheme = '', host, rest] = m;
+    const labels = host.split('.');
+    if (labels.length < 2) return token;
+    const fixedHost = labels.map((label, i) => (i === labels.length - 1 ? label : label.split('-').map(fixWord).join('-'))).join('.');
+    return scheme + fixedHost + rest;
+  });
+}
+
 /** Text we are willing to act on, or null when OCR found nothing readable (a plain photo gives low-confidence noise). */
 export function readableText(text: string, confidence: number): string | null {
-  const cleaned = repairWrappedUrls(text);
+  const cleaned = fixOcrUrls(repairWrappedUrls(text));
   const alnum = (cleaned.match(/[a-z0-9]/gi) ?? []).length;
   return confidence >= 55 && alnum >= 12 ? cleaned : null;
 }

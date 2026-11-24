@@ -12,7 +12,7 @@ import { minersMatching, pickMiners } from '../../telegraph/discovery.js';
 import { classify, type Item } from '../extract.js';
 import { hostImage, type Hosted } from '../imagehost.js';
 import { ocr as localOcr } from '../ocr.js';
-import { imageVerdict, MAX_IMAGE_BYTES, readableText, readForensics, sniffImage, STUB_MINER_RE, worstFirst, type ImageType } from '../image.js';
+import { defangDomain, imageVerdict, MAX_IMAGE_BYTES, readableText, readForensics, sniffImage, STUB_MINER_RE, worstFirst, type ImageType } from '../image.js';
 import { shortAddr } from '../payments.js';
 
 export class ImageError extends Error {}
@@ -61,12 +61,12 @@ async function forensics(id: string, url: string): Promise<Forensic> {
 }
 
 const itemLabel: Record<Item['kind'], string> = { LINK: 'Link', TX: 'Transaction', ADDRESS: 'Address', CLAIM: 'Claim', REVIEW: 'Reviews' };
-const shorten = (item: Item) => (item.kind === 'TX' ? `${item.value.slice(0, 10)}…${item.value.slice(-6)}` : item.kind === 'ADDRESS' ? shortAddr(item.value) : item.kind === 'CLAIM' ? `“${item.value.slice(0, 80)}${item.value.length > 80 ? '…' : ''}”` : item.value.slice(0, 120));
+const shorten = (item: Item) => (item.kind === 'LINK' ? defangDomain(item.value) : item.kind === 'TX' ? `${item.value.slice(0, 10)}…${item.value.slice(-6)}` : item.kind === 'ADDRESS' ? shortAddr(item.value) : item.kind === 'CLAIM' ? `“${item.value.slice(0, 80)}${item.value.length > 80 ? '…' : ''}”` : item.value.slice(0, 120));
 
 export async function analyseImage(buf: Buffer, deps: ImageDeps): Promise<{ summary: CheckResult; items: CheckResult[] }> {
-  if (buf.length > MAX_IMAGE_BYTES) throw new ImageError('That image is too large (max 5 MB).');
+  if (buf.length > MAX_IMAGE_BYTES) throw new ImageError('This picture is too big. Please send one under 5 MB.');
   const img = sniffImage(buf);
-  if (!img) throw new ImageError('That file is not a PNG, JPEG or WebP image.');
+  if (!img) throw new ImageError('I can only read PNG, JPEG or WebP pictures.');
   const id = randomUUID().slice(0, 8);
 
   // Forensic purchases run while OCR and the item checks run.

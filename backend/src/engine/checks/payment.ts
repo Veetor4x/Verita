@@ -26,20 +26,24 @@ async function purchase(ctx: Ctx, label: string, ...args: Parameters<typeof buy>
   return p;
 }
 
-/** Lookup through Telegraph. Prefers the richest miner we can discover (one exposing /check-tx: decodes token transfers). */
+/**
+ * Lookup through Telegraph. Rankings change (and some top miners cannot take our input), so we try several miners in
+ * order: first the ones that decode token transfers (found by their /check-tx endpoint, at any rank), then the best-ranked
+ * others. A failed ask is not charged, so trying the next one is free.
+ */
 async function lookupViaTelegraph(ctx: Ctx, hash: string, chain: ChainInfo): Promise<Lookup | null> {
   const params = { tx_hash: hash, chain: chain.telegraph };
-  const ranked = await pickMiners(LOOKUP, 30, []).catch(() => []);
+  const ranked = await pickMiners(LOOKUP, 200, []).catch(() => []);
   const rich = await minersWithEndpoint(LOOKUP, '/check-tx');
-  const richMiner = ranked.find((m) => rich.has(m.id));
-  if (richMiner) {
-    const p = await purchase(ctx, 'transaction lookup', { intent: LOOKUP, params }, 1, ctx.tracker, richMiner.id, { method: 'GET', endpoint: '/check-tx', payload: params });
+  for (const m of ranked.filter((x) => rich.has(x.id)).slice(0, 2)) {
+    const p = await purchase(ctx, 'transaction lookup', { intent: LOOKUP, params }, 1, ctx.tracker, m.id, { method: 'GET', endpoint: '/check-tx', payload: params });
     if (p?.ok) return parseLookup(p.data);
   }
-  const top = ranked.find((m) => m.id !== richMiner?.id);
-  if (!top) return null;
-  const p = await purchase(ctx, 'transaction lookup', { intent: LOOKUP, params }, 1, ctx.tracker, top.id);
-  return p?.ok ? parseLookup(p.data) : null;
+  for (const m of ranked.filter((x) => !rich.has(x.id)).slice(0, 5)) {
+    const p = await purchase(ctx, 'transaction lookup', { intent: LOOKUP, params }, 1, ctx.tracker, m.id);
+    if (p?.ok) return parseLookup(p.data);
+  }
+  return null;
 }
 
 /** USD price of a symbol from the best-ranked price miners (tries the top two). */
@@ -103,7 +107,8 @@ export async function checkTx(hash: string): Promise<CheckResult> {
     ({ status, from, to, valueEth, hasCalldata } = lookup);
   } else {
     const tx = rpcTx!; // checked above: we have a lookup or an RPC transaction
-    status = rpcStatus(await receiptStatus(chain, hash)); from = tx.from.toLowerCase(); to = tx.to?.toLowerCase();
+    status = rpcStatus(await receiptStatus(chain, hash, !!tx.blockNumber)); // a block number means it is mined
+    from = tx.from.toLowerCase(); to = tx.to?.toLowerCase();
     valueEth = weiHexToNumber(tx.value); hasCalldata = !!tx.input && tx.input !== '0x';
   }
 

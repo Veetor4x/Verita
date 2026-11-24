@@ -64,7 +64,7 @@ if (config.telegramToken) {
     try { await ready; await bot.handleUpdate(update); } catch (e) { console.error('update failed:', (e as Error).message); }
   });
   if (config.publicUrl) {
-    bot.api.setWebhook(`${config.publicUrl}/telegram/webhook`, { secret_token: config.webhookSecret || undefined, allowed_updates: ['message'] })
+    bot.api.setWebhook(`${config.publicUrl}/telegram/webhook`, { secret_token: config.webhookSecret || undefined, allowed_updates: ['message', 'callback_query'] })
       .then(() => console.log('webhook set'))
       .catch((e) => console.error('setWebhook failed:', e.message));
   } else console.warn('PUBLIC_URL not set: webhook not registered');

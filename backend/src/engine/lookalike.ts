@@ -20,18 +20,6 @@ export function findLookalikes(addr: string, known: string[]): string[] {
   return [...new Set(known.filter((k) => isLookalike(addr, k)).map((k) => k.toLowerCase()))];
 }
 
-/** The warning text (Telegram HTML). Both addresses are shown IN FULL so the difference in the middle is visible. */
-export function lookalikeWarning(newAddr: string, similar: string[]): string {
-  const list = similar.slice(0, 2).map((s) => `<code>${s}</code>`).join('\n');
-  return [
-    '⚠️ <b>Look-alike address</b>',
-    `<code>${newAddr.toLowerCase()}</code>`,
-    'starts and ends like an address you checked here before, but it is a different address:',
-    list,
-    'Scammers copy the first and last characters (address poisoning). Compare EVERY character before sending money.',
-  ].join('\n');
-}
-
 /** Addresses to compare in a payment result: the input if it is an address, and every address in its facts except the token contract. */
 export function addressesOfResult(input: string, facts: { label: string; value: string }[] = []): string[] {
   const found = new Set<string>();
