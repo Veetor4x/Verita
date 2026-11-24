@@ -2,6 +2,7 @@
 //   🔴 / 🟡 results: headline, one reason, one warning line.  🟢 results: one line.
 // No counts, no cost, no "sources/miners/signals", no "the agent bought more": all of that stays on the /c/:id page.
 import type { CheckResult } from '../../../shared/types.js';
+import { isQuestion } from '../engine/claims.js';
 import { officialUrl } from '../web/official.js';
 import { IMAGE_EDITED_REASON, NO_TEXT_LINE, defangDomain } from '../engine/image.js';
 export { defangDomain };
@@ -58,8 +59,9 @@ function linkParts(r: CheckResult, name?: string): Parts {
 }
 
 function claimParts(r: CheckResult): Parts {
-  if (r.verdict === 'SAFE') return { head: '🟢 This looks true.', why: 'Trusted websites agree.' };
-  if (r.verdict === 'SCAM') return { head: '🔴 This is false.', why: 'Trusted websites say it is not true.' };
+  const q = isQuestion(r.input);
+  if (r.verdict === 'SAFE') return { head: q ? '🟢 Yes, this is true.' : '🟢 This looks true.', why: 'Trusted websites agree.' };
+  if (r.verdict === 'SCAM') return { head: q ? '🔴 No, this is false.' : '🔴 This is false.', why: 'Trusted websites say it is not true.' };
   const head = '🟡 We could not check if this is true.';
   if (has(r, /partly true|misleading/)) return { head, why: 'Parts of it may be wrong.' };
   if (has(r, /sources disagree/)) return { head, why: 'Websites do not agree about it.' };
