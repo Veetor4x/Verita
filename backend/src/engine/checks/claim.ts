@@ -6,14 +6,15 @@ import { randomUUID } from 'node:crypto';
 import type { CheckResult } from '../../../../shared/types.js';
 import { buy, SpendTracker, type Purchase } from '../planner.js';
 import { pickMiners } from '../../telegraph/discovery.js';
-import { claimsAgree, claimVerdict, toClaimSignal, type ClaimSignal } from '../claims.js';
+import { questionToStatement, claimsAgree, claimVerdict, toClaimSignal, type ClaimSignal } from '../claims.js';
 
 const failed = (intent: string, e: unknown): Purchase => ({
   receipt: { intent, minerId: 'routed', costUsd: 0, signalHash: '', round: 1 },
   signal: { intent, minerId: null, flagged: null }, ok: false, error: String((e as Error)?.message ?? e),
 });
 
-export async function checkClaim(claim: string): Promise<CheckResult> {
+export async function checkClaim(original: string): Promise<CheckResult> {
+  const claim = questionToStatement(original); // miners check the statement; the reply keeps the original wording
   const id = randomUUID().slice(0, 8);
   const tracker = await SpendTracker.create();
   const bought: Purchase[] = [];
@@ -40,9 +41,9 @@ export async function checkClaim(claim: string): Promise<CheckResult> {
     bought.push(...r2.filter((p): p is Purchase => !!p && p.ok));
   }
 
-  const out = claimVerdict(bought.map(signalOf), claim);
+  const out = claimVerdict(bought.map(signalOf), claim, original);
   return {
-    id, kind: 'CLAIM', input: claim, verdict: out.verdict, reasons: out.reasons,
+    id, kind: 'CLAIM', input: original, verdict: out.verdict, reasons: out.reasons,
     officialCheck: { status: out.official.status, links: out.official.links },
     details: {
       sources: [], miners: [...new Set(bought.map((p) => p.receipt.minerId))],

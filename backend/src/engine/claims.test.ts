@@ -206,3 +206,29 @@ test('present-tense question: same trusted-source rule as the claim inside it', 
   assert.equal(claimVerdict([sig('a', 'true', { urls: ['https://www.nhs.uk/is-paris-in-france'] })], 'Is Paris in France?').verdict, 'SAFE');
   assert.equal(claimVerdict([sig('a', 'false')], bleach).verdict, 'CAREFUL'); // no trusted link
 });
+
+import { questionToStatement } from './claims.js';
+test('questionToStatement: simple deterministic rewrites', () => {
+  const cases: [string, string][] = [
+    ['Is drinking bleach a cure for COVID?', 'Drinking bleach cures COVID'],
+    ['is bleach a cure for covid-19?', 'Bleach cures covid-19'],
+    ['Is this Elon giveaway real?', 'This Elon giveaway is real'],
+    ['Is metamask-wallet-verify.xyz a scam?', 'Metamask-wallet-verify.xyz is a scam'],
+    ['Are vaccines safe?', 'Vaccines are safe'],
+    ['Does bleach cure covid?', 'Bleach cures covid'],
+    ['Does garlic prevent colds?', 'Garlic prevents colds'],
+    ['Can bleach cure covid?', 'Bleach can cure covid'],
+    ['Has the cash ban been announced?', 'The cash ban has been announced'],
+    ['Bleach cures covid?', 'Bleach cures covid'],
+  ];
+  for (const [i, o] of cases) assert.equal(questionToStatement(i), o, i);
+});
+test('questionToStatement: statements and unknown shapes are left alone (or only lose the ?)', () => {
+  assert.equal(questionToStatement('Drinking bleach cures COVID-19.'), 'Drinking bleach cures COVID-19.');
+  assert.equal(questionToStatement('Is it what it seems?'), 'Is it what it seems'); // unknown shape: only the ? goes
+});
+test('rewritten statement + original question: relevance uses the statement, future check uses the original', () => {
+  const st = questionToStatement('Is drinking bleach a cure for COVID?');
+  assert.equal(claimVerdict([sig('a', 'false'), sig('b', 'unknown', { urls: ['https://www.cidrap.umn.edu/bleach-cure-covid'] })], st, 'Is drinking bleach a cure for COVID?').verdict, 'SCAM');
+  assert.equal(claimVerdict([sig('a', 'false', { urls: ['https://www.cdc.gov/x-tomorrow'] })], questionToStatement('Will x happen tomorrow?'), 'Will x happen tomorrow?').verdict, 'CAREFUL');
+});
