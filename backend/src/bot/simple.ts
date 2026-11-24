@@ -8,6 +8,8 @@ import { IMAGE_EDITED_REASON, NO_TEXT_LINE, defangDomain } from '../engine/image
 export { defangDomain };
 
 export const WARN = '⚠️ Always check the official site before you act.';
+export const CLAIM_WARN = '⚠️ Check trusted news before you share.';
+export const CLAIM_TIP = 'Tip: send the news link or a screenshot of the post for a better check.';
 
 /** Two addresses shortened so the FIRST place they differ is always visible (the middle is where scammers differ). */
 export function compareShort(a: string, b: string): [string, string] {
@@ -32,11 +34,11 @@ export type View = {
   shareText?: string;
 };
 
-type Parts = { head: string; why?: string; warn?: boolean };
+type Parts = { head: string; why?: string; warn?: boolean; warnText?: string; tip?: string };
 const lines = (p: Parts, verdict: CheckResult['verdict']) => {
   // 🟢 is one line; 🔴 and 🟡 get the reason and the warning.
   if (verdict === 'SAFE') return [p.why ? `${p.head} ${p.why}` : p.head];
-  return [p.head, ...(p.why ? [p.why] : []), ...(p.warn === false ? [] : [WARN])];
+  return [p.head, ...(p.why ? [p.why] : []), ...(p.warn === false ? [] : [p.warnText ?? WARN]), ...(p.tip ? [p.tip] : [])];
 };
 
 const has = (r: CheckResult, re: RegExp) => r.reasons.some((x) => re.test(x));
@@ -61,6 +63,10 @@ function linkParts(r: CheckResult, name?: string): Parts {
 }
 
 function claimParts(r: CheckResult): Parts {
+  const p = claimBase(r);
+  return { ...p, warnText: CLAIM_WARN, ...(r.verdict === 'CAREFUL' ? { tip: CLAIM_TIP } : {}) };
+}
+function claimBase(r: CheckResult): Parts {
   const q = isQuestion(r.input);
   if (r.verdict === 'SAFE') return { head: q ? '🟢 Yes, this is true.' : '🟢 This looks true.', why: 'Trusted websites agree.' };
   if (r.verdict === 'SCAM') return { head: q ? '🔴 No, this is false.' : '🔴 This is false.', why: 'Trusted websites say it is not true.' };
