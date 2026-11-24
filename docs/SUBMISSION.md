@@ -3,6 +3,7 @@
 ## 1. Form answers
 - **Project:** Verità · **Track:** Apps & Agents · **Missions:** 07 Consumer Platform (primary), 14 Web3 Native & DeFi (secondary)
 - **Pitch:** Check if a link, a news claim or a crypto payment is legit before you act on it. Every verdict is bought from several ranked Telegraph miners, with verifiable receipts, settled on-chain per epoch.
+- **Promo video:** https://youtu.be/SAiHnsqHNUY
 - **Links:** repo github.com/Veetor4x/Verita · live https://verita-znay.onrender.com · bot https://t.me/AskVeritaBot · receipts docs/RECEIPTS.md · stats /stats
 - **Autonomous purchases:** the agent pays Telegraph itself (escrow rail, x402 fallback). It picks intents, buys 2 answers, and buys more from top-ranked miners if they disagree. No human approves a purchase. Caps: $0.10/check, $10/day (the live Render setting).
 - **Education:** every 🔴 says in plain words why it is a scam (for example "it pretends to be MetaMask; the real site is metamask.io"), so users learn the pattern, not just the verdict.
