@@ -179,7 +179,26 @@ export type ClaimOutcome = {
  * Reasons (max 3): one number-free sentence + the "N checks bought" line.
  * Source links: only real URLs returned by miners, credible ones first, max 3.
  */
+/** A question or a future event ("barcelona plays real madrid tomorrow?"): there is nothing to call true or false yet. */
+export function isQuestionOrFuture(claim: string): boolean {
+  const c = claim.trim().toLowerCase();
+  return /\?\s*$/.test(c)
+    || /^(is|are|was|were|will|does|do|did|can|could|should|would|has|have|who|what|when|where|why|how|which)\b/.test(c)
+    || /\b(tomorrow|tonight|next (week|month|year|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|later today|this (weekend|evening)|soon|will|going to|upcoming)\b/.test(c);
+}
+export const NO_INFO_REASON = "We couldn't find reliable info on this yet.";
+
 export function claimVerdict(signals: ClaimSignal[], claim?: string): ClaimOutcome {
+  if (claim && isQuestionOrFuture(claim)) {
+    // Never "false" for a question or something that has not happened: only a clear "true" from a trusted source can pass.
+    const urls = [...new Set(signals.flatMap((s) => s.urls))].filter((u) => isRelevantUrl(claim, u));
+    const trusted = urls.filter(isTrustedUrl);
+    const t = tally(signals);
+    if (t.trueVotes >= 1 && t.falseVotes === 0 && t.mixedVotes === 0 && trusted.length > 0 && !/\b(tomorrow|tonight|next |will|going to|soon|upcoming)\b/i.test(claim)) {
+      return { verdict: 'SAFE', reasons: ['A trusted source confirms this claim.', claimBoughtLine(signals)].slice(0, 3), sourceLinks: [...trusted, ...urls.filter((u) => !trusted.includes(u))].slice(0, 3), official: { status: 'FOUND', links: trusted.slice(0, 3) } };
+    }
+    return { verdict: 'CAREFUL', reasons: [NO_INFO_REASON, claimBoughtLine(signals)].slice(0, 3), sourceLinks: urls.slice(0, 3), official: { status: urls.length ? 'CLOSE' : 'NOT_FOUND', links: [] } };
+  }
   const { trueVotes, falseVotes, mixedVotes } = tally(signals);
   // Only sources that relate to the claim (when we know the claim text).
   const allUrls = [...new Set(signals.flatMap((s) => s.urls))].filter((u) => !claim || isRelevantUrl(claim, u));

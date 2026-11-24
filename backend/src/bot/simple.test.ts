@@ -58,3 +58,14 @@ test('buttons data: official site only for links, source button only when links 
   const cv = simpleReply(c); assert.equal(cv.officialUrl, undefined); assert.equal(cv.sources?.label, 'Read sources');
   assert.equal(simpleReply(mk('LINK', 'SAFE', 'http://x.xyz')).sources, undefined);
 });
+
+test('claim: a question/future event says "couldn\'t find reliable info", never "false"', () => {
+  const r = mk('CLAIM', 'CAREFUL', 'barcelona plays real madrid tomorrow?', ["We couldn't find reliable info on this yet.", '4 checks bought: 1 said it\'s false.']);
+  const v = simpleReply(r);
+  assert.match(v.text, /We couldn't find reliable info on this yet/);
+  assert.doesNotMatch(v.text, /false|myth/i);
+});
+test('claim: a myth-wording-only answer is not shown as "says it is false"', () => {
+  const v = simpleReply(mk('CLAIM', 'CAREFUL', 'x is y', ['One source calls this claim a myth or scam, but nothing else could confirm it.']));
+  assert.doesNotMatch(v.text, /says it is false/);
+});
