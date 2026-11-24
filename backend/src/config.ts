@@ -16,6 +16,8 @@ export const config = {
   telegramToken: process.env.TELEGRAM_BOT_TOKEN || '',
   webhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || '',
   port: num(process.env.PORT, 3000),
+  // Telegram user ids of the owner / testers (comma separated): their checks count as "testing" on /stats, never as real usage.
+  ownerTelegramIds: (process.env.OWNER_TELEGRAM_IDS || '').split(',').map((x) => x.trim()).filter(Boolean),
   // auto = escrow first, x402 fallback. Or force 'escrow' / 'x402'.
   paymentMode: (['escrow', 'x402'].includes(process.env.PAYMENT_MODE || '') ? process.env.PAYMENT_MODE : 'auto') as 'auto' | 'escrow' | 'x402',
   network: 'eip155:11155111' as `${string}:${string}`,

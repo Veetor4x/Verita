@@ -4,7 +4,7 @@ import { esc, titleOf } from '../bot/format.js';
 import { CLAIM_OFFICIAL_TEXT } from '../engine/claims.js';
 import { config } from '../config.js';
 import { officialUrl } from './official.js';
-import type { Stats } from '../db/index.js';
+import type { Stats, StatBlock } from '../db/index.js';
 
 const CLASS = { SAFE: 'safe', CAREFUL: 'careful', SCAM: 'scam' } as const;
 const DISCLAIMER = '⚠️ Always confirm on official channels before acting.';
@@ -93,17 +93,26 @@ export function resultPage(r: CheckResult): string {
 export function statsPage(s: Stats): string {
   const latest = s.latest.map((x) => `
 <li><span class="meta">${esc(x.intent)} · R${x.round} · miner ${esc(x.minerId ?? '-')} · ${esc(x.at.replace('T', ' ').slice(0, 16))} UTC</span>${verifyLink(x.signalHash)}</li>`).join('');
+  const block = (b: StatBlock, extra: string) => `
+<div class="grid">${extra}
+  <div class="stat"><b>${b.checks}</b><span>checks run</span></div>
+  <div class="stat"><b>$${b.spentUsd.toFixed(2)}</b><span>USDC spent</span></div>
+  <div class="stat"><b>${b.receipts}</b><span>receipts</span></div>
+  <div class="stat"><b>${b.escalated}</b><span>escalated to Round 2</span></div>
+</div>
+<p class="meta">${b.cacheHits} of these checks were served from cache at $0.</p>`;
   const body = `
 <h1>Verità in numbers</h1>
-<p class="lead">Every verdict is bought from Telegraph miners. These are the real purchases so far (testnet USDC).</p>
-<div class="grid">
-  <div class="stat"><b>${s.checks}</b><span>checks run</span></div>
-  <div class="stat"><b>$${s.spentUsd.toFixed(2)}</b><span>USDC spent</span></div>
-  <div class="stat"><b>${s.receipts}</b><span>receipts</span></div>
-  <div class="stat"><b>${s.escalated}</b><span>escalated to Round 2</span></div>
-</div>
-<p class="meta">${s.cacheHits} of the checks were served from cache at $0.</p>
-<h2>Latest 10 signal hashes</h2>
+<p class="lead">Every verdict is bought from Telegraph miners (testnet USDC). Real usage and testing are counted separately and never added together.</p>
+<h2>Real usage</h2>
+<p class="meta">Telegram users other than the owner. ${s.real.checks === 0 ? 'No real users yet.' : ''}</p>
+${block(s.real, `
+  <div class="stat"><b>${s.real.users}</b><span>unique users</span></div>
+  <div class="stat"><b>${s.real.groups}</b><span>groups protected</span></div>`)}
+<h2>Testing</h2>
+<p class="meta">The owner, test scripts and website checks (the website does not identify visitors, so its checks are counted here).</p>
+${block(s.testing, '')}
+<h2>Latest 10 signal hashes (real and testing)</h2>
 <p class="meta">Tap one to verify it on Telegraph.</p>
 <ul class="hashes">${latest || '<li class="meta">No purchases yet.</li>'}</ul>`;
   return page('Verità – Stats', body, 'Public stats: checks run, USDC spent and the latest Telegraph signal hashes.');

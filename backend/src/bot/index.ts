@@ -14,7 +14,7 @@ import { entityFrom } from '../engine/reputation.js';
 import { runCheck } from '../engine/run.js';
 import { analyseImage, ImageError } from '../engine/checks/image.js';
 import { MAX_IMAGE_BYTES } from '../engine/image.js';
-import { saveCheck, getCheck, knownAddresses, rememberAddresses } from '../db/index.js';
+import { saveCheck, getCheck, knownAddresses, rememberAddresses, recordUsage, type UsageEvent } from '../db/index.js';
 import { addressesOfResult, findLookalikes } from '../engine/lookalike.js';
 import { linkLabel } from './format.js';
 import { imageReply, simpleReply, type LookalikeHit, type View } from './simple.js';
@@ -59,7 +59,7 @@ export type ImageDeps = {
   analyse: (buf: Buffer, caption: string) => Promise<{ summary: CheckResult; items: CheckResult[] }>;
   save: (r: CheckResult) => Promise<void>;
 };
-export type BotDeps = { images?: ImageDeps; lookalike?: LookalikeDeps; loadCheck?: (id: string) => Promise<CheckResult | null> };
+export type BotDeps = { images?: ImageDeps; lookalike?: LookalikeDeps; loadCheck?: (id: string) => Promise<CheckResult | null>; usage?: (u: UsageEvent) => Promise<void> };
 
 // ---- what media does a message carry? ----
 type Media = { kind: 'image'; fileId: string } | { kind: 'video' };
@@ -87,6 +87,10 @@ function keyboardFor(view: View): InlineKeyboard | undefined {
   const kb = new InlineKeyboard();
   let any = false;
   if (config.publicUrl) { kb.url('More details', `${config.publicUrl}/c/${view.moreId}`); any = true; }
+  if (view.shareText && config.publicUrl) {
+    // Opens Telegram's own "share to..." picker with the warning and the link already filled in.
+    kb.url('Share warning', `https://t.me/share/url?url=${encodeURIComponent(`${config.publicUrl}/c/${view.moreId}`)}&text=${encodeURIComponent(view.shareText)}`); any = true;
+  }
   if (view.officialUrl) { kb.url('Official site', view.officialUrl); any = true; }
   if (view.sources) { kb.text(view.sources.label, `src:${view.sources.id}`); any = true; }
   return any ? kb : undefined;
@@ -97,6 +101,13 @@ export function createBot(token: string, run: Runner = runCheck, botConfig?: Bot
   const bot = new Bot(token, botConfig);
   const lookalike: LookalikeDeps = deps.lookalike ?? { known: knownAddresses, remember: rememberAddresses };
   const loadCheck = deps.loadCheck ?? getCheck;
+  const usage = deps.usage ?? (async (u: UsageEvent) => { if (config.databaseUrl) await recordUsage(u); });
+  /** Remember WHO asked (ids only) so /stats can tell real usage from owner testing. */
+  async function noteUsage(ctx: Context, checkId: string) {
+    if (!ctx.from || !ctx.chat) return;
+    try { await usage({ checkId, userId: String(ctx.from.id), chatId: String(ctx.chat.id), chatType: ctx.chat.type }); }
+    catch (e) { console.error('usage log failed:', (e as Error).message); }
+  }
   const images: ImageDeps = deps.images ?? {
     download: (fileId) => downloadTelegramFile(bot.api, token, fileId),
     analyse: (buf, caption) => analyseImage(buf, { run, publicUrl: config.imageForensics ? config.publicUrl : undefined, caption }),
@@ -146,6 +157,7 @@ export function createBot(token: string, run: Runner = runCheck, botConfig?: Bot
         const { hit } = await lookalikeFor(ctx, [r]);
         await finish(ctx, note?.message_id, ...viewText(simpleReply(r, { lookalike: hit, showName: items.length > 1 })), to);
         await remember(ctx, [r]);
+        await noteUsage(ctx, r.id);
       } catch (e) {
         console.error('check failed:', safeError(e, token));
         await finish(ctx, note?.message_id, SORRY, undefined, to);
@@ -165,6 +177,7 @@ export function createBot(token: string, run: Runner = runCheck, botConfig?: Bot
       const { hit } = await lookalikeFor(ctx, items);
       await finish(ctx, note?.message_id, ...viewText(imageReply(summary, items, { lookalike: hit })), to);
       await remember(ctx, items);
+      await noteUsage(ctx, summary.id);
     } catch (e) {
       console.error('image check failed:', safeError(e, token)); // never log a message that could contain the token
       await finish(ctx, note?.message_id, e instanceof ImageError ? e.message : SORRY, undefined, to);
