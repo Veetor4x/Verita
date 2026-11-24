@@ -28,6 +28,8 @@ export type View = {
   officialUrl?: string;
   /** A "Read reviews" / "Read sources" button (opens a list of site buttons) for this check. */
   sources?: { label: string; id: string };
+  /** Only on 🔴: a short plain warning to forward (the bot adds the /c/:id link). */
+  shareText?: string;
 };
 
 type Parts = { head: string; why?: string; warn?: boolean };
@@ -106,12 +108,19 @@ function imageParts(r: CheckResult): Parts {
   return r.verdict === 'SAFE' ? { head: '🟢 We found nothing risky in this image.' } : { head: '🟡 Be careful with this image.', why: 'Open More details to see why.' };
 }
 
+/** A short, plain warning to forward to friends or a group (🔴 only). Links are defanged. */
+export function shareTextFor(r: CheckResult, why?: string): string {
+  const what = r.kind === 'LINK' ? `the link ${defangDomain(r.input)}` : r.kind === 'CLAIM' ? 'a message that says something false'
+    : r.kind === 'PAYMENT' ? 'a risky wallet or payment' : r.kind === 'REVIEW' ? 'a site that people call a scam' : 'a picture with a scam in it';
+  return [`🔴 Warning: Verità says ${what} is a scam or false. Do not trust it.`, ...(why ? [why] : [])].join(' ');
+}
+
 /** The reply for one result. */
 export function simpleReply(r: CheckResult, opts: { lookalike?: LookalikeHit; showName?: boolean } = {}): View {
   const base = { moreId: r.id } as View;
   if (opts.lookalike && r.kind === 'PAYMENT') {
     const [before, now] = compareShort(opts.lookalike.before, opts.lookalike.now);
-    return { ...base, text: ['🔴 Careful! This wallet copies one you checked before. Check every character.', `Before: ${before}  Now: ${now}`].join('\n') };
+    return { ...base, shareText: '🔴 Warning: a wallet address in our chat copies one we used before. Check every character before you send money.', text: ['🔴 Careful! This wallet copies one you checked before. Check every character.', `Before: ${before}  Now: ${now}`].join('\n') };
   }
   const parts =
     r.kind === 'LINK' ? linkParts(r, opts.showName ? defangDomain(r.input) : undefined)
@@ -120,6 +129,7 @@ export function simpleReply(r: CheckResult, opts: { lookalike?: LookalikeHit; sh
     : r.kind === 'REVIEW' ? reviewParts(r)
     : imageParts(r);
   const view: View = { ...base, text: lines(parts, r.verdict).join('\n') };
+  if (r.verdict === 'SCAM') view.shareText = shareTextFor(r, parts.why);
   const official = officialUrl(r);
   if (official && r.officialCheck.status === 'CLOSE') view.officialUrl = official;
   const links = r.details.sourceLinks ?? [];

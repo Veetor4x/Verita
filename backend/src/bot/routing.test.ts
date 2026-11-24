@@ -28,7 +28,7 @@ async function drive(message: Record<string, unknown>, chatType: 'private' | 'su
   const msgs: { id: number; text: string; markup?: any }[] = []; let mid = 500;
   const bot = createBot('123:TEST', async (item) => { ran.push(item); return (o.run ?? defaultRun)(item); }, {
     botInfo: { id: 123, is_bot: true, first_name: 'Verita', username: 'AskVeritaBot', can_join_groups: true, can_read_all_group_messages: true, supports_inline_queries: false, can_connect_to_business: false, has_main_web_app: false } as any,
-  }, { lookalike: noHistory, loadCheck: async () => null, ...o.deps });
+  }, { lookalike: noHistory, loadCheck: async () => null, usage: async () => {}, ...o.deps });
   bot.api.config.use(async (_prev, method, payload: any) => {
     calls.push({ method, payload });
     if (method === 'sendMessage') { const id = ++mid; msgs.push({ id, text: String(payload.text), markup: payload.reply_markup }); return { ok: true, result: { message_id: id, date: 0, chat: { id: 1, type: chatType } } } as any; }
@@ -94,9 +94,14 @@ test('STYLE: scam link, exactly the target reply, with More details and Official
   await withUrl(async () => {
     const r = await drive({ text: 'look http://metamask-wallet-verify.xyz/connect' }, 'private', { run: async () => scamLink });
     assert.equal(r.replies[0], "🔴 Scam. Don't open this link.\nIt pretends to be MetaMask. The real site is metamask.io.\n⚠️ Always check the official site before you act.");
-    assert.deepEqual(r.buttons(r.msgs[0]).map((b) => b.text), ['More details', 'Official site']);
+    assert.deepEqual(r.buttons(r.msgs[0]).map((b) => b.text), ['More details', 'Share warning', 'Official site']);
     assert.equal(r.buttons(r.msgs[0])[0].url, 'https://verita.example.com/c/abc12345');
-    assert.equal(r.buttons(r.msgs[0])[1].url, 'https://metamask.io');
+    const share = new URL(r.buttons(r.msgs[0])[1].url!);
+    assert.equal(share.origin + share.pathname, 'https://t.me/share/url');
+    assert.equal(share.searchParams.get('url'), 'https://verita.example.com/c/abc12345');
+    assert.match(share.searchParams.get('text')!, /^🔴 Warning: Verità says the link metamask-wallet-verify\[\.\]xyz is a scam/);
+    assert.ok(!share.searchParams.get('text')!.includes('http'));
+    assert.equal(r.buttons(r.msgs[0])[2].url, 'https://metamask.io');
   });
 });
 test('STYLE: safe link is ONE line, no warning, only More details', async () => {
@@ -176,7 +181,7 @@ test('REVIEWS: none found = nothing about reviews and no button; found = a "Read
     assert.equal(btns[1].callback_data, 'src:rev00001');
 
     // pressing it: one message with each review site as a button
-    const bot = createBot('123:TEST', defaultRun, { botInfo: { id: 123, is_bot: true, first_name: 'V', username: 'AskVeritaBot', can_join_groups: true, can_read_all_group_messages: true, supports_inline_queries: false } as any }, { lookalike: noHistory, loadCheck: async (id) => (id === 'rev00001' ? base('LINK', 'CAREFUL', 'x', { id }, { sourceLinks: links }) : null) });
+    const bot = createBot('123:TEST', defaultRun, { botInfo: { id: 123, is_bot: true, first_name: 'V', username: 'AskVeritaBot', can_join_groups: true, can_read_all_group_messages: true, supports_inline_queries: false } as any }, { lookalike: noHistory, usage: async () => {}, loadCheck: async (id) => (id === 'rev00001' ? base('LINK', 'CAREFUL', 'x', { id }, { sourceLinks: links }) : null) });
     const sent: any[] = [];
     bot.api.config.use(async (_p, method, payload: any) => { sent.push({ method, payload }); return { ok: true, result: method === 'sendMessage' ? { message_id: 9, date: 0, chat: { id: 1, type: 'private' } } : true } as any; });
     await bot.handleUpdate({ update_id: ++n, callback_query: { id: 'cb1', from: { id: 77, is_bot: false, first_name: 'u' }, chat_instance: 'ci', data: 'src:rev00001', message: { message_id: 5, date: 0, chat: { id: 1, type: 'private', first_name: 'u' } } } } as any);
@@ -307,4 +312,20 @@ test('safeError strips the token from anything that gets logged', () => {
   const token = '123456:ABC-secret';
   const s = safeError(new Error(`request to https://api.telegram.org/file/bot${token}/photos/a.jpg failed`), token);
   assert.ok(!s.includes(token) && !s.includes('ABC-secret') && !/file\/bot[0-9]/.test(s), s);
+});
+
+test('usage: who asked is recorded (ids only) for every answered check', async () => {
+  const seen: any[] = [];
+  await withUrl(async () => {
+    await drive({ text: 'https://www.google.com/' }, 'private', { run: async () => safeLink, deps: { usage: async (u) => { seen.push(u); } } });
+  });
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].checkId, safeLink.id);
+  assert.deepEqual(Object.keys(seen[0]).sort(), ['chatId', 'chatType', 'checkId', 'userId']);
+});
+test('share warning: only on 🔴, never on 🟢', async () => {
+  await withUrl(async () => {
+    const r = await drive({ text: 'https://www.google.com/' }, 'private', { run: async () => safeLink });
+    assert.ok(!r.buttons(r.msgs[0]).some((b) => b.text === 'Share warning'));
+  });
 });

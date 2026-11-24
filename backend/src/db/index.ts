@@ -70,24 +70,45 @@ export async function findCachedCheck(kind: string, input: string): Promise<Chec
   return rows[0]?.result ?? null;
 }
 
-// ---- public stats (/stats) ----
+// ---- who asked (Telegram ids only) ----
+export type UsageEvent = { checkId: string; userId: string; chatId: string; chatType: string };
+export async function recordUsage(u: UsageEvent) {
+  await sql().query(`insert into usage_events (check_id, tg_user_id, tg_chat_id, chat_type) values ($1,$2,$3,$4)`, [u.checkId, u.userId, u.chatId, u.chatType]);
+}
+
+// ---- public stats (/stats): "real usage" (Telegram users other than the owner) and "testing" (everything else) are never mixed ----
+export type StatBlock = { checks: number; cacheHits: number; spentUsd: number; receipts: number; escalated: number };
 export type Stats = {
-  checks: number; cacheHits: number; spentUsd: number; receipts: number; escalated: number;
+  real: StatBlock & { users: number; groups: number };
+  testing: StatBlock;
   latest: { signalHash: string; intent: string; minerId: string | null; round: number; at: string }[];
 };
 
+const REAL = `with u as (select check_id, tg_user_id, tg_chat_id, chat_type from usage_events where tg_user_id <> all($1::text[]))`;
+
 export async function getStats(): Promise<Stats> {
-  const [c, p, e, latest] = await Promise.all([
-    // A "check" = anything that bought at least one signal (distinct check_id in purchases, includes engine test runs)
-    // plus cache hits (served at $0, never in purchases).
+  const owners = config.ownerTelegramIds;
+  const [c, p, e, ru, rp, latest] = await Promise.all([
+    // A "check" = anything that bought at least one signal (distinct check_id in purchases) plus cache hits (served at $0).
     sql().query(`select ((select count(distinct check_id) from purchases where check_id is not null) + (select count(*) from checks where cached))::int as checks,
                         (select count(*) from checks where cached)::int as cache_hits`),
     sql().query(`select coalesce(sum(cost_usd),0)::float as spent, count(*) filter (where signal_hash is not null and signal_hash <> '')::int as receipts from purchases`),
     sql().query(`select count(distinct check_id)::int as escalated from purchases where round = 2 and check_id is not null`),
+    sql().query(`${REAL} select (select count(*) from u)::int as checks, (select count(distinct tg_user_id) from u)::int as users,
+                        (select count(distinct tg_chat_id) from u where chat_type in ('group','supergroup'))::int as groups,
+                        (select count(*) from u join checks c on c.id = u.check_id where c.cached)::int as cache_hits`, [owners]),
+    sql().query(`${REAL} select coalesce(sum(cost_usd),0)::float as spent, count(*) filter (where signal_hash is not null and signal_hash <> '')::int as receipts,
+                        count(distinct check_id) filter (where round = 2)::int as escalated from purchases where check_id in (select check_id from u)`, [owners]),
     sql().query(`select signal_hash, intent, miner_id, round, created_at from purchases where signal_hash is not null and signal_hash <> '' order by created_at desc limit 10`),
   ]) as any[][];
+  const real = { checks: ru[0].checks, users: ru[0].users, groups: ru[0].groups, cacheHits: ru[0].cache_hits, spentUsd: Number(rp[0].spent), receipts: rp[0].receipts, escalated: rp[0].escalated };
+  const total = { checks: c[0].checks, cacheHits: c[0].cache_hits, spentUsd: Number(p[0].spent), receipts: p[0].receipts, escalated: e[0].escalated };
+  const testing: StatBlock = {
+    checks: Math.max(0, total.checks - real.checks), cacheHits: Math.max(0, total.cacheHits - real.cacheHits),
+    spentUsd: Math.max(0, total.spentUsd - real.spentUsd), receipts: Math.max(0, total.receipts - real.receipts), escalated: Math.max(0, total.escalated - real.escalated),
+  };
   return {
-    checks: c[0].checks, cacheHits: c[0].cache_hits, spentUsd: Number(p[0].spent), receipts: p[0].receipts, escalated: e[0].escalated,
+    real, testing,
     latest: latest.map((r: any) => ({ signalHash: r.signal_hash, intent: r.intent, minerId: r.miner_id, round: r.round, at: new Date(r.created_at).toISOString() })),
   };
 }

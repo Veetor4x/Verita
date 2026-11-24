@@ -38,3 +38,14 @@ create table if not exists seen_addresses (
   first_seen timestamptz not null default now(),
   primary key (chat_id, address)
 );
+
+-- who asked for a check on Telegram (ids only, never message text): splits real usage from owner testing on /stats
+create table if not exists usage_events (
+  id bigserial primary key,
+  check_id text not null,
+  tg_user_id text not null,
+  tg_chat_id text not null,
+  chat_type text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists usage_events_user_idx on usage_events (tg_user_id)
