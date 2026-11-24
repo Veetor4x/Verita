@@ -63,7 +63,8 @@ function claimParts(r: CheckResult): Parts {
   const head = '🟡 We could not check if this is true.';
   if (has(r, /partly true|misleading/)) return { head, why: 'Parts of it may be wrong.' };
   if (has(r, /sources disagree/)) return { head, why: 'Websites do not agree about it.' };
-  if (has(r, /says this claim is false|calls this claim a myth/)) return { head, why: 'One website says it is false, but we could not be sure.' };
+  if (has(r, /says this claim is false/)) return { head, why: 'One website says it is false, but we could not be sure.' };
+  if (has(r, /reliable info/)) return { head: "🟡 We couldn't find reliable info on this yet.", why: '' };
   return { head, why: 'No trusted website clearly says yes or no.' };
 }
 
