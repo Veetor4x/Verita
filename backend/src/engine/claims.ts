@@ -29,6 +29,18 @@ export function isCredibleHost(host: string): boolean {
   const h = host.toLowerCase().replace(/^www\./, '');
   return CREDIBLE_DOMAINS.some((d) => h === d || h.endsWith('.' + d)) || CREDIBLE_SUFFIXES.some((s) => h.endsWith(s));
 }
+// Trusted for the one-source rule: health bodies, governments, universities and the main fact-checkers.
+const TRUSTED_DOMAINS = [
+  'who.int', 'cdc.gov', 'nhs.uk', 'reuters.com', 'apnews.com', 'afp.com', 'snopes.com', 'fullfact.org', 'africacheck.org', 'dubawa.org',
+  'factcheck.org', 'politifact.com',
+];
+const TRUSTED_SUFFIXES = ['.gov', '.edu', '.gov.ng', '.gov.uk', '.ac.uk', '.edu.ng', '.gov.za', '.gov.au'];
+export function isTrustedHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^www\./, '');
+  return TRUSTED_DOMAINS.some((d) => h === d || h.endsWith('.' + d)) || TRUSTED_SUFFIXES.some((s) => h.endsWith(s));
+}
+export const isTrustedUrl = (u: string) => { try { return isTrustedHost(new URL(u).hostname); } catch { return false; } };
+
 export const isCredibleUrl = (u: string) => { try { return isCredibleHost(new URL(u).hostname); } catch { return false; } };
 
 // ---- stance from a verdict word ----
@@ -174,11 +186,17 @@ export function claimVerdict(signals: ClaimSignal[], claim?: string): ClaimOutco
   const credible = allUrls.filter(isCredibleUrl);
   const sourceLinks = [...credible, ...allUrls.filter((u) => !credible.includes(u))].slice(0, 3);
 
+  // A trusted source (WHO, CDC, NHS, .gov, .edu, big fact-checkers) that says false/true counts alone, when nothing says the opposite.
+  const trustedUrls = new Set(allUrls.filter(isTrustedUrl));
+  const trustedSays = (stance: 'true' | 'false') => onePerMiner(signals).some((s) =>
+    (stance === 'true' ? s.stance === 'true' : s.stance === 'false' || (s.debunk && s.stance !== 'true')) && s.urls.some((u) => trustedUrls.has(u)));
+
   let verdict: Verdict; let why: string;
   const explicitFalse = signals.some((s) => s.stance === 'false');
   if (falseVotes >= 2 && trueVotes === 0) { verdict = 'SCAM'; why = explicitFalse ? 'Independent sources say this claim is false.' : 'Independent sources call this claim a myth, scam or misinformation.'; }
+  else if (falseVotes >= 1 && trueVotes === 0 && trustedSays('false')) { verdict = 'SCAM'; why = 'A trusted source says this claim is false.'; }
+  else if (trueVotes >= 1 && falseVotes === 0 && mixedVotes === 0 && trustedSays('true')) { verdict = 'SAFE'; why = 'A trusted source confirms this claim.'; }
   else if (trueVotes >= 2 && falseVotes === 0 && mixedVotes === 0) { verdict = 'SAFE'; why = 'Independent sources confirm this claim.'; }
-  else if (trueVotes === 1 && falseVotes === 0 && mixedVotes === 0 && credible.length > 0) { verdict = 'SAFE'; why = 'A source confirms this claim and credible sources back it up.'; }
   else if (trueVotes > 0 && falseVotes > 0) { verdict = 'CAREFUL'; why = 'The sources disagree about this claim.'; }
   else if (falseVotes === 1) { verdict = 'CAREFUL'; why = explicitFalse ? 'One source says this claim is false, but nothing else could confirm it.' : 'One source calls this claim a myth or scam, but nothing else could confirm it.'; }
   else if (mixedVotes > 0) { verdict = 'CAREFUL'; why = 'Sources say this claim is only partly true or misleading.'; }

@@ -60,7 +60,7 @@ test('verdict: 2 false -> 🔴; 2 true -> 🟢; mixed/unknown -> 🟡', () => {
 });
 test('verdict: one true needs a credible source to be 🟢', () => {
   assert.equal(claimVerdict([sig('a', 'true'), sig('b', 'unknown')]).verdict, 'CAREFUL');
-  assert.equal(claimVerdict([sig('a', 'true', { urls: ['https://www.britannica.com/x'] }), sig('b', 'unknown')]).verdict, 'SAFE');
+  assert.equal(claimVerdict([sig('a', 'true', { urls: ['https://www.cdc.gov/x'] }), sig('b', 'unknown')]).verdict, 'SAFE');
   assert.equal(claimVerdict([sig('a', 'true', { urls: ['https://myblog.example.com/x'] }), sig('b', 'unknown')]).verdict, 'CAREFUL');
 });
 test('verdict: one miner answering twice is one vote', () => {
@@ -146,4 +146,32 @@ test('wording: debunk-language alone is not "says this claim is false"', () => {
   assert.equal(two.verdict, 'SCAM'); assert.match(two.reasons[0], /myth, scam or misinformation/);
   const explicit = claimVerdict([sig('a', 'false'), sig('b', 'unknown', { debunk: true })]);
   assert.equal(explicit.verdict, 'SCAM'); assert.match(explicit.reasons[0], /say this claim is false/);
+});
+
+import { isTrustedUrl } from './claims.js';
+test('trusted hosts: health bodies, .gov/.edu, big fact-checkers; not blogs or Wikipedia', () => {
+  for (const u of ['https://www.who.int/x', 'https://www.cdc.gov/a', 'https://www.nhs.uk/a', 'https://x.gov/a', 'https://cs.mit.edu/a', 'https://www.reuters.com/fact-check/a',
+    'https://apnews.com/a', 'https://factcheck.afp.com/a', 'https://www.snopes.com/a', 'https://fullfact.org/a', 'https://africacheck.org/a', 'https://dubawa.org/a']) assert.ok(isTrustedUrl(u), u);
+  for (const u of ['https://myblog.example.com/a', 'https://en.wikipedia.org/wiki/x', 'https://notwho.int.evil.com/a', 'https://fakecdc.gov.evil.com/a']) assert.ok(!isTrustedUrl(u), u);
+});
+test('trusted source says false, nothing says true -> 🔴 even with one source', () => {
+  const o = claimVerdict([sig('a', 'false', { urls: ['https://www.who.int/x'] }), sig('b', 'unknown')]);
+  assert.equal(o.verdict, 'SCAM'); assert.match(o.reasons[0], /trusted source says this claim is false/);
+  assert.equal(claimVerdict([sig('a', 'unknown', { debunk: true, urls: ['https://www.snopes.com/x'] })]).verdict, 'SCAM'); // debunk wording from a fact-checker
+});
+test('one false from an untrusted source stays 🟡', () => {
+  assert.equal(claimVerdict([sig('a', 'false', { urls: ['https://myblog.example.com/x'] }), sig('b', 'unknown')]).verdict, 'CAREFUL');
+  assert.equal(claimVerdict([sig('a', 'false'), sig('b', 'unknown')]).verdict, 'CAREFUL');
+});
+test('trusted false but another source says true -> 🟡', () => {
+  assert.equal(claimVerdict([sig('a', 'false', { urls: ['https://www.cdc.gov/x'] }), sig('b', 'true')]).verdict, 'CAREFUL');
+});
+test('trusted source says true, nothing says false -> 🟢; a false or mixed answer stops it', () => {
+  assert.equal(claimVerdict([sig('a', 'true', { urls: ['https://www.nhs.uk/x'] }), sig('b', 'unknown')]).verdict, 'SAFE');
+  assert.equal(claimVerdict([sig('a', 'true', { urls: ['https://www.nhs.uk/x'] }), sig('b', 'false')]).verdict, 'CAREFUL');
+  assert.equal(claimVerdict([sig('a', 'true', { urls: ['https://www.nhs.uk/x'] }), sig('b', 'mixed')]).verdict, 'CAREFUL');
+  assert.equal(claimVerdict([sig('a', 'true', { urls: ['https://en.wikipedia.org/wiki/x'] }), sig('b', 'unknown')]).verdict, 'CAREFUL'); // credible but not trusted
+});
+test('an irrelevant trusted URL does not count', () => {
+  assert.equal(claimVerdict([sig('a', 'false', { urls: ['https://www.cdc.gov/flu-shots'] }), sig('b', 'unknown')], 'Drinking bleach cures covid').verdict, 'CAREFUL');
 });
