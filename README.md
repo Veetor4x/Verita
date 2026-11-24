@@ -8,6 +8,7 @@ Built solo by [Veetor4x](https://github.com/Veetor4x) for the Telegraph Protocol
 
 - **Live:** https://verita-znay.onrender.com (home page with a paste box, `/stats` with live receipts)
 - **Bot:** [@AskVeritaBot](https://t.me/AskVeritaBot)
+- **Proof:** [receipts](docs/RECEIPTS.md) · [/stats](https://verita-znay.onrender.com/stats)
 
 ## What it checks
 
@@ -82,7 +83,7 @@ npm run dev          # production: npx tsx src/index.ts
 
 In BotFather run `/setprivacy` → **Disable**, or the bot cannot see links posted in groups.
 
-**Tests:** `npm test` (about 160 unit tests; none spends money or uses the network). Live suites that do spend a little: `scripts/link-suite.mjs`, `claim-suite.mjs`, `payment-suite.mjs`, `review-suite.mjs`, `image-suite.mjs`.
+**Tests:** `npm test` (about 200 unit tests; none spends money or uses the network). Live suites that do spend a little: `scripts/link-suite.mjs`, `claim-suite.mjs`, `payment-suite.mjs`, `review-suite.mjs`, `image-suite.mjs`.
 
 **Deploy:** one Render web service. Build `cd backend && npm ci --include=dev`, start `cd backend && npx tsx src/index.ts`, with the variables above. UptimeRobot pinging `/health` every 5 minutes keeps the free plan awake.
 
