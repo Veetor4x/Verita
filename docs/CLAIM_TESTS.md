@@ -9,7 +9,7 @@ Run: `NODE_USE_ENV_PROXY=1 npx tsx backend/scripts/claim-suite.mjs [runs] ["clai
 - **Verdict (deterministic, one vote per miner):**
   - 🔴 *false*: 2+ sources say false (an explicit "False" verdict, or debunking words such as myth / hoax / misinformation / scam in a search answer) and none says true.
   - 🟢 *confirmed true*: 2+ say true and none says false, OR 1 says true, a credible source backs it, and nothing contradicts it.
-  - **Trusted-source rule (Nov 24):** one answer is enough when it says false (or debunks) AND that same answer carries a relevant link from a trusted domain (WHO, CDC, NHS, `.gov`, `.edu`, Reuters, AP, AFP Fact Check, Snopes, Full Fact, Africa Check, Dubawa, FactCheck.org, PolitiFact) and nothing says true → 🔴. Reverse: it says true + trusted link, and nothing says false or mixed → 🟢. A single true now needs a *trusted* link (Wikipedia/Britannica/BBC no longer count for that). An untrusted lone vote stays 🟡.
+  - **Trusted-source rule (Nov 24):** one answer is enough when at least one answer says false (or debunks), nothing says true, and a relevant link from a trusted domain (WHO, CDC, NHS, `.gov`, `.edu`, Reuters, AP, AFP Fact Check, Snopes, Full Fact, Africa Check, Dubawa, FactCheck.org, PolitiFact) was returned by ANY miner → 🔴. Reverse: one answer says true, nothing says false or mixed, same kind of trusted link → 🟢. A single "true" needs a trusted link (Wikipedia/Britannica/BBC do not count for that). A trusted link alone, without an opinion, stays 🟡. Links must pass the relevance filter (share key words with the claim).
   - 🟡 *unverified or mixed*: everything else, including "nobody could verify it".
 - **Reasons:** max 3: one sentence + `N checks bought: 1 said it's true, 1 said it's false, 1 called it a myth or scam, 2 could not verify it.` ("said it's false" = explicit verdict; "called it a myth or scam" = debunking words, a weaker signal, worded differently).
 - **Sources:** up to 3 links, **only real URLs the miners returned**, credible ones first (Wikipedia, Britannica, Reuters, AP, BBC, `.gov`, `.edu`, WHO, fact-checkers...). A link is dropped when its URL shares no meaningful word with the claim (before this filter the cash-ban claim showed "Say's law" and "OnlyFans").
@@ -42,5 +42,13 @@ Scorecard: **3 true claims → 1 🟢, 2 🟡 · 3 false claims → 1 🔴, 2 �
 - The unranked "do-everything" miners (a1-preflight, chainsight...) have no per-intent score right now, so Round 2 never picks them even though a1-preflight answered "True" correctly in an early survey.
 
 
-## Re-run Nov 24 (after the trusted-source rule, 1 run per claim, ~$0.32)
-All five claims stayed 🟡 live. The one-source rule did not fire because the miner that said "false"/"myth" did not return a trusted link itself (e.g. bleach: the CIDRAP `.edu` page came from a different miner than the debunk wording). We do not assume a page says "false" just because it was listed. Rule is covered by unit tests (`src/engine/claims.test.ts`).
+## Re-run Nov 24 (looser trusted-source rule, 1 run per claim, ~$0.32)
+| Claim | Result | Why |
+|---|---|---|
+| Drinking bleach cures COVID-19. | 🔴 | a "myth" answer + the CIDRAP (`.edu`) page returned by another miner |
+| Argentina won the 2022 World Cup | 🟡 | no miner gave a "true" answer this run (was 🟢 on Nov 18; miner answers vary) |
+| Eiffel Tower / Bitcoin 21M | 🟡 | nobody gave a verdict |
+| Great Wall visible from Moon | 🟡 | 1 "false" but only Wikipedia links (not trusted) |
+| Musk 5000 BTC giveaway | 🟡 | 1 "false", only Wikipedia links |
+| Vague claims (economy crash, cash ban) | 🟡 | nobody could verify |
+No claim reached 🟢 this run.

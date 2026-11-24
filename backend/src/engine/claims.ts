@@ -186,16 +186,14 @@ export function claimVerdict(signals: ClaimSignal[], claim?: string): ClaimOutco
   const credible = allUrls.filter(isCredibleUrl);
   const sourceLinks = [...credible, ...allUrls.filter((u) => !credible.includes(u))].slice(0, 3);
 
-  // A trusted source (WHO, CDC, NHS, .gov, .edu, big fact-checkers) that says false/true counts alone, when nothing says the opposite.
-  const trustedUrls = new Set(allUrls.filter(isTrustedUrl));
-  const trustedSays = (stance: 'true' | 'false') => onePerMiner(signals).some((s) =>
-    (stance === 'true' ? s.stance === 'true' : s.stance === 'false' || (s.debunk && s.stance !== 'true')) && s.urls.some((u) => trustedUrls.has(u)));
+  // A trusted, relevant link from ANY miner (WHO, CDC, NHS, .gov, .edu, big fact-checkers) lets one false/true answer decide, when nothing says the opposite.
+  const hasTrusted = allUrls.some(isTrustedUrl);
 
   let verdict: Verdict; let why: string;
   const explicitFalse = signals.some((s) => s.stance === 'false');
   if (falseVotes >= 2 && trueVotes === 0) { verdict = 'SCAM'; why = explicitFalse ? 'Independent sources say this claim is false.' : 'Independent sources call this claim a myth, scam or misinformation.'; }
-  else if (falseVotes >= 1 && trueVotes === 0 && trustedSays('false')) { verdict = 'SCAM'; why = 'A trusted source says this claim is false.'; }
-  else if (trueVotes >= 1 && falseVotes === 0 && mixedVotes === 0 && trustedSays('true')) { verdict = 'SAFE'; why = 'A trusted source confirms this claim.'; }
+  else if (falseVotes >= 1 && trueVotes === 0 && hasTrusted) { verdict = 'SCAM'; why = 'A trusted source says this claim is false.'; }
+  else if (trueVotes >= 1 && falseVotes === 0 && mixedVotes === 0 && hasTrusted) { verdict = 'SAFE'; why = 'A trusted source confirms this claim.'; }
   else if (trueVotes >= 2 && falseVotes === 0 && mixedVotes === 0) { verdict = 'SAFE'; why = 'Independent sources confirm this claim.'; }
   else if (trueVotes > 0 && falseVotes > 0) { verdict = 'CAREFUL'; why = 'The sources disagree about this claim.'; }
   else if (falseVotes === 1) { verdict = 'CAREFUL'; why = explicitFalse ? 'One source says this claim is false, but nothing else could confirm it.' : 'One source calls this claim a myth or scam, but nothing else could confirm it.'; }

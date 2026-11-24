@@ -175,3 +175,13 @@ test('trusted source says true, nothing says false -> 🟢; a false or mixed ans
 test('an irrelevant trusted URL does not count', () => {
   assert.equal(claimVerdict([sig('a', 'false', { urls: ['https://www.cdc.gov/flu-shots'] }), sig('b', 'unknown')], 'Drinking bleach cures covid').verdict, 'CAREFUL');
 });
+
+test('trusted link from ANOTHER miner counts: false answer + trusted link elsewhere -> 🔴; true -> 🟢', () => {
+  assert.equal(claimVerdict([sig('a', 'false'), sig('b', 'unknown', { urls: ['https://www.cdc.gov/x'] })]).verdict, 'SCAM');
+  assert.equal(claimVerdict([sig('a', 'unknown', { debunk: true }), sig('b', 'unknown', { urls: ['https://www.snopes.com/x'] })]).verdict, 'SCAM');
+  assert.equal(claimVerdict([sig('a', 'true'), sig('b', 'unknown', { urls: ['https://www.nhs.uk/x'] })]).verdict, 'SAFE');
+  // still needs the vote, the trusted link alone is not an opinion
+  assert.equal(claimVerdict([sig('a', 'unknown', { urls: ['https://www.cdc.gov/x'] })]).verdict, 'CAREFUL');
+  // and a contradicting answer blocks it
+  assert.equal(claimVerdict([sig('a', 'false'), sig('b', 'true', { urls: ['https://www.cdc.gov/x'] })]).verdict, 'CAREFUL');
+});
