@@ -122,3 +122,7 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 - Payment: tries several lookup miners (rich /check-tx miner at any rank); a mined tx with no receipt is no longer "pending".
 - Official site button only for CLOSE matches.
 - Not yet tested through real Telegram: photo flow, "Read reviews" buttons, edit-in-place.
+
+## Nov 24: landing page redesign
+- `/` rebuilt to match the brand (logo, banner): own CSS/JS in `backend/src/web/public/landing.{css,js}`, no frameworks or CDNs. Aurora + dot grid + spotlight, border-beam paste box, shimmer button, floating verdict cards, 3 steps, bento grid, live numbers (count-up from `/api/stats`) and a marquee of the latest signal hashes (links to Telegraph verify). Same paste form and rate limits. Respects `prefers-reduced-motion`; no horizontal scroll at 375px.
+- Brand files: `mark.svg` (header logo + favicon, also on the other pages), `logo.png` (apple-touch-icon), `og.png` (og:image + Twitter card).
