@@ -126,3 +126,6 @@ Rule: if link check + bot aren't working by Nov 20, drop all NICE items and the 
 ## Nov 24: landing page redesign
 - `/` rebuilt to match the brand (logo, banner): own CSS/JS in `backend/src/web/public/landing.{css,js}`, no frameworks or CDNs. Aurora + dot grid + spotlight, border-beam paste box, shimmer button, floating verdict cards, 3 steps, bento grid, live numbers (count-up from `/api/stats`) and a marquee of the latest signal hashes (links to Telegraph verify). Same paste form and rate limits. Respects `prefers-reduced-motion`; no horizontal scroll at 375px.
 - Brand files: `mark.svg` (header logo + favicon, also on the other pages), `logo.png` (apple-touch-icon), `og.png` (og:image + Twitter card).
+
+## Nov 24 (later): landing page simplified
+Home page cut to hero, paste box (border beam + 3 example chips), 3-step "How it works" and a footer (Telegram · GitHub · Proof & receipts → /stats). Floating cards, bento grid, number ticker and hash marquee removed from `/`; the numbers and latest signal hashes stay on `/stats`.
