@@ -15,6 +15,7 @@ const page = (title: string, body: string, description: string) => `<!doctype ht
 <meta name="color-scheme" content="light dark">
 <meta name="description" content="${esc(description)}">
 <title>${esc(title)}</title>
+<link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/logo.png">
 <link rel="stylesheet" href="/style.css"></head>
 <body><main>
 <header class="top"><a class="brand" href="/">Verità</a><span class="net">Sepolia testnet</span></header>
@@ -110,32 +111,122 @@ export function statsPage(s: Stats): string {
 
 export const TELEGRAM_BOT_URL = 'https://t.me/AskVeritaBot';
 export const MAX_WEB_TEXT = 4000;
+export const GITHUB_URL = 'https://github.com/Veetor4x/Verita';
 
-/** The home page: pitch, paste box, Add to Telegram, how it works, link to /stats. Server-rendered, no JS needed. */
+/** The home page. Server-rendered; the form works without JS (landing.js only adds polish and the live numbers). */
 export function landingPage(opts: { error?: string; text?: string } = {}): string {
-  const body = `
-<h1>Check before you act.</h1>
-<p class="lead">Check if a link, a news claim or a crypto payment is legit before you act on it. Every verdict is bought from several ranked Telegraph miners, with on-chain receipts.</p>
+  const ogImage = `${config.publicUrl}/og.png`;
+  const title = 'Verità: check before you click, share or pay';
+  const desc = 'Send a link, message, screenshot or wallet. Get 🟢 safe, 🟡 careful or 🔴 scam. Answers are bought from several Telegraph miners, with receipts.';
+  const chips: [string, string][] = [
+    ['Fake MetaMask link', 'http://metamask-wallet-verify.xyz/connect'],
+    ['Bleach claim', 'Drinking bleach cures COVID-19.'],
+    ['A wallet address', '0xd7a193Ae8a09b5BDc7E0888AFa51C20759bd9E68'],
+  ];
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#05050a">
+<title>${esc(title)}</title>
+<meta name="description" content="${esc(desc)}">
+<link rel="icon" href="/mark.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/logo.png">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Verità">
+<meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}">
+<meta property="og:image" content="${esc(ogImage)}"><meta property="og:image:width" content="1600"><meta property="og:image:height" content="900">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(title)}">
+<meta name="twitter:description" content="${esc(desc)}"><meta name="twitter:image" content="${esc(ogImage)}">
+<link rel="stylesheet" href="/landing.css">
+<script src="/landing.js" defer></script></head>
+<body>
+<a class="skip" href="#check">Skip to the checker</a>
+<div class="bg" aria-hidden="true"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="dots"></div><div class="spot"></div></div>
 
-${opts.error ? `<p class="card careful err" role="alert">${esc(opts.error)}</p>` : ''}
-<form class="paste" method="post" action="/check" onsubmit="var b=this.querySelector('button');b.disabled=true;b.textContent='Checking… this can take up to a minute'">
-  <label for="text" class="lbl">Paste a link, a claim, a transaction hash or a wallet address</label>
-  <textarea id="text" name="text" rows="5" maxlength="${MAX_WEB_TEXT}" required placeholder="https://… or a statement to fact-check, or 0x…">${esc(opts.text ?? '')}</textarea>
-  <button class="btn" type="submit">Check</button>
-</form>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="/" aria-label="Verità home"><img src="/mark.svg" alt="" width="34" height="34">Verità</a>
+  <nav class="links" aria-label="Main"><a href="/stats">Stats</a><a href="${esc(GITHUB_URL)}" rel="noopener" target="_blank">GitHub</a></nav>
+</header>
 
-<a class="btn tg" href="${TELEGRAM_BOT_URL}" rel="noopener" target="_blank">Add to Telegram</a>
-<p class="meta">In a group the bot checks every link posted. Reply to anything else with /check. It also reads screenshots.</p>
+<main>
+<section class="hero">
+  <span class="chip"><i></i>Telegraph Hackathon S2 · Apps &amp; Agents</span>
+  <div class="logo"><img src="/mark.svg" alt="" width="64" height="64"><span>Verità</span></div>
+  <h1>Check before you <span class="grad">click, share or pay.</span></h1>
+  <p class="lead">Send a link, message, screenshot or wallet. Get 🟢 safe, 🟡 careful or 🔴 scam.</p>
+  <div class="cta">
+    <a class="btn shimmer" href="${TELEGRAM_BOT_URL}" rel="noopener" target="_blank">Add to Telegram</a>
+    <a class="btn" id="try" href="#check">Try it here</a>
+  </div>
+</section>
 
-<h2>How it works</h2>
-<ol class="steps">
-  <li><strong>You send something.</strong> A link, a claim, a transaction or wallet address, or a screenshot (Telegram).</li>
-  <li><strong>Verità buys evidence.</strong> It pays several ranked Telegraph miners itself, and buys more from other miners when the first answers disagree.</li>
-  <li><strong>You get a verdict you can check.</strong> 🟢 looks safe, 🟡 be careful or 🔴 likely scam, with the reasons and the receipts (tap a hash to verify it on Telegraph).</li>
-</ol>
+<section id="check" aria-labelledby="check-h">
+  <h2 id="check-h" class="sr" style="position:absolute;left:-999px">Check something</h2>
+  ${opts.error ? `<p class="err" role="alert">${esc(opts.error)}</p>` : ''}
+  <div class="beam">
+    <form class="paste" method="post" action="/check" onsubmit="var b=this.querySelector('button');b.disabled=true;b.textContent='Checking… up to a minute'">
+      <label for="text">Paste a link, a claim, a transaction or a wallet address</label>
+      <textarea id="text" name="text" rows="3" maxlength="${MAX_WEB_TEXT}" required placeholder="https://… or a claim, or 0x…">${esc(opts.text ?? '')}</textarea>
+      <div class="row"><button class="btn go" type="submit">Check</button></div>
+    </form>
+  </div>
+  <div class="examples" role="group" aria-label="Examples">
+    ${chips.map(([label, fill]) => `<button type="button" class="ex" data-fill="${esc(fill)}">${esc(label)}</button>`).join('\n    ')}
+  </div>
+</section>
 
-<p><a href="/stats">See the live numbers and receipts →</a></p>`;
-  return page('Verità – check before you act', body, 'Check if a link, a news claim or a crypto payment is legit before you act on it. Verdicts are bought from several ranked Telegraph miners, with on-chain receipts.');
+<section aria-labelledby="demo-h">
+  <h2 id="demo-h">What you get</h2>
+  <p class="sub">Short answers. No jargon.</p>
+  <div class="demo">
+    <div class="vc r"><b>Scam. Don't open this link.</b><p>It pretends to be MetaMask. The real site is metamask.io.</p></div>
+    <div class="vc y"><b>Careful! This wallet is a copy.</b><p>It looks like one you used before. Check every character.</p></div>
+    <div class="vc g"><b>Looks safe.</b><p>We found no problems with this link.</p></div>
+  </div>
+</section>
+
+<section aria-labelledby="how-h">
+  <h2 id="how-h">How it works</h2>
+  <p class="sub">Three steps.</p>
+  <ol class="steps">
+    <li><b>You send it</b><span>A link, message, screenshot or wallet.</span></li>
+    <li><b>Our agent buys answers</b><span>It pays several Telegraph miners, and buys more if they disagree.</span></li>
+    <li><b>You get a simple answer</b><span>With receipts you can check.</span></li>
+  </ol>
+</section>
+
+<section aria-labelledby="catch-h">
+  <h2 id="catch-h">What it catches</h2>
+  <p class="sub">The tricks people fall for.</p>
+  <div class="bento">
+    <div class="tile"><span class="ic" aria-hidden="true">🎣</span><h3>Fake sites</h3><p>Links that copy a real bank, wallet or shop.</p></div>
+    <div class="tile"><span class="ic" aria-hidden="true">📰</span><h3>Fake news</h3><p>Claims that spread fast but are not true. We show where we looked.</p></div>
+    <div class="tile"><span class="ic" aria-hidden="true">👛</span><h3>Copied wallets</h3><p>A wallet that looks like one you used before.</p></div>
+    <div class="tile"><span class="ic" aria-hidden="true">🖼️</span><h3>Scam screenshots</h3><p>Send a picture. We read it and check the links in it.</p></div>
+    <div class="tile"><span class="ic" aria-hidden="true">🛡️</span><h3>Group guard</h3><p>Add the bot to a group. It checks every link posted.</p></div>
+  </div>
+</section>
+
+<section aria-labelledby="proof-h">
+  <h2 id="proof-h">Proof, not promises</h2>
+  <p class="sub">Real numbers from our own server. Every receipt can be checked on Telegraph.</p>
+  <div class="nums">
+    <div class="num"><strong data-stat="checks">–</strong><span>checks run</span></div>
+    <div class="num"><strong data-stat="receipts">–</strong><span>receipts</span></div>
+    <div class="num"><strong data-stat="spent">–</strong><span>test USDC spent</span></div>
+  </div>
+  <div class="marquee" aria-label="Latest receipts"><div class="track" id="track" data-verify="${esc(config.telegraphBaseUrl)}"></div></div>
+  <p class="more"><a href="/stats">See all the numbers →</a></p>
+</section>
+</main>
+
+<footer>
+  <div class="row"><a href="${TELEGRAM_BOT_URL}" rel="noopener" target="_blank">t.me/AskVeritaBot</a><a href="${esc(GITHUB_URL)}" rel="noopener" target="_blank">GitHub</a><a href="/stats">Stats</a></div>
+  <p>⚠️ Always check the official site before you act.</p>
+  <p>Testnet only. Built for Telegraph Protocol Hackathon S2.</p>
+</footer>
+</div>
+</body></html>`;
 }
 
 /** Several things were checked from one paste: one card per result, worst first. */

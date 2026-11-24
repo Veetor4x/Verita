@@ -20,17 +20,27 @@ async function withServer(run: (i: Item) => Promise<CheckResult>, allow: (k: str
 }
 const post = (base: string, text: string) => fetch(base + '/check', { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ text }) });
 
-test('landing page: pitch, paste box, Add to Telegram (exact URL), How it works (3 steps), link to /stats, mobile viewport', () => {
+test('landing page: hero, paste box (same form), Add to Telegram (exact URL), 3 steps, bento, proof, footer warning', () => {
   const h = landingPage();
-  assert.match(h, /Check if a link, a news claim or a crypto payment is legit before you act on it/);
+  assert.match(h, /Check before you <span class="grad">click, share or pay\./);
+  assert.match(h, /Send a link, message, screenshot or wallet\. Get 🟢 safe, 🟡 careful or 🔴 scam\./);
   assert.match(h, /<form class="paste" method="post" action="\/check"/);
   assert.match(h, /<textarea[^>]*name="text"[^>]*maxlength="4000"/);
   assert.equal(TELEGRAM_BOT_URL, 'https://t.me/AskVeritaBot');
-  assert.ok(h.includes('href="https://t.me/AskVeritaBot"') && h.includes('Add to Telegram'));
-  assert.match(h, /How it works/); assert.equal((h.match(/<li><strong>/g) ?? []).length, 3);
-  assert.ok(h.includes('href="/stats"'));
+  assert.ok(h.includes('href="https://t.me/AskVeritaBot"') && h.includes('Add to Telegram') && h.includes('Try it here'));
+  assert.match(h, /How it works/); assert.equal((h.match(/<ol class="steps">[\s\S]*?<\/ol>/)![0].match(/<li>/g) ?? []).length, 3);
+  assert.equal((h.match(/class="tile"/g) ?? []).length, 5);
+  assert.equal((h.match(/class="ex"/g) ?? []).length, 3);
+  assert.ok(h.includes('href="/stats"') && h.includes('data-stat="checks"') && h.includes('id="track"'));
   assert.match(h, /name="viewport" content="width=device-width,initial-scale=1"/);
-  assert.match(h, /Always confirm on official channels before acting/);
+  assert.match(h, /Always check the official site before you act/);
+});
+test('landing page: brand files, og + twitter card, no external scripts, styles or fonts', () => {
+  const h = landingPage();
+  assert.ok(h.includes('rel="icon" href="/mark.svg"') && h.includes('rel="apple-touch-icon" href="/logo.png"'));
+  assert.match(h, /property="og:image" content="[^"]*\/og\.png"/); assert.match(h, /name="twitter:card" content="summary_large_image"/);
+  assert.match(h, /name="twitter:image" content="[^"]*\/og\.png"/);
+  assert.ok(!/<(script|link)[^>]+(src|href)="https?:/.test(h));
 });
 test('landing page escapes what the visitor typed (error page keeps the text)', () => {
   const h = landingPage({ error: '<script>alert(1)</script>', text: '"><img src=x onerror=alert(1)>' });
