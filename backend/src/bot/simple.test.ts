@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compareShort, defangDomain, imageReply, simpleReply, WARN } from './simple.js';
+import { compareShort, defangDomain, imageReply, simpleReply, WARN, CLAIM_WARN, CLAIM_TIP } from './simple.js';
 import type { CheckResult } from '../../../shared/types.js';
 
 const mk = (kind: CheckResult['kind'], verdict: CheckResult['verdict'], input: string, reasons: string[] = [], details: Partial<CheckResult['details']> = {}): CheckResult => ({
@@ -35,8 +35,10 @@ test('no jargon in any reply text', () => {
   for (const k of kinds) for (const v of ['SAFE', 'CAREFUL', 'SCAM'] as const) {
     const t = simpleReply(mk(k, v, k === 'PAYMENT' ? '0x' + 'a'.repeat(40) : 'http://x.xyz/', ['x'])).text;
     assert.ok(!/source|signal|miner|escalat|OCR|network|bought|\$|<|>/i.test(t), `${k}/${v}: ${t}`);
-    assert.equal(t.includes(WARN), v !== 'SAFE', `${k}/${v}`);
-    assert.ok(t.split('\n').length <= 3);
+    assert.equal(t.includes(k === 'CLAIM' ? CLAIM_WARN : WARN), v !== 'SAFE', `${k}/${v}`);
+    assert.equal(t.includes(k === 'CLAIM' ? WARN : CLAIM_WARN), false, `${k}/${v}`);
+    assert.equal(t.includes(CLAIM_TIP), k === 'CLAIM' && v === 'CAREFUL', `${k}/${v}`);
+    assert.ok(t.split('\n').length <= (k === 'CLAIM' && v === 'CAREFUL' ? 4 : 3));
   }
 });
 test('wallet activity wording', () => {

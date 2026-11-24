@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBot, CHECKING, READING_IMAGE, VIDEO_SOON, type BotDeps, type ImageDeps, type LookalikeDeps } from './index.js';
-import { WARN } from './simple.js';
+import { WARN, CLAIM_WARN, CLAIM_TIP } from './simple.js';
 import { config } from '../config.js';
 import { safeError } from './telegramFile.js';
 import { ImageError } from '../engine/checks/image.js';
@@ -120,16 +120,18 @@ test('STYLE: the warning line is on 🔴 and 🟡 only, never on 🟢; max 3 lin
   ];
   for (const c of cases) {
     const r = await drive({ text: 'check https://x.example.com/' }, 'private', { run: async () => c });
-    const text = r.replies[0]; const hasWarn = text.includes(WARN);
-    assert.equal(hasWarn, c.verdict !== 'SAFE', `${c.kind}/${c.verdict}: ${text}`);
-    assert.ok(text.split('\n').length <= 3, text);
+    const text = r.replies[0]; const mine = c.kind === 'CLAIM' ? CLAIM_WARN : WARN; const other = c.kind === 'CLAIM' ? WARN : CLAIM_WARN;
+    assert.equal(text.includes(mine), c.verdict !== 'SAFE', `${c.kind}/${c.verdict}: ${text}`);
+    assert.ok(!text.includes(other), `${c.kind}/${c.verdict}: ${text}`); // claims never say "official site"; links and payments never say "trusted news"
+    assert.equal(text.includes(CLAIM_TIP), c.kind === 'CLAIM' && c.verdict === 'CAREFUL', `${c.kind}/${c.verdict}: ${text}`);
+    assert.ok(text.split('\n').length <= (c.kind === 'CLAIM' && c.verdict === 'CAREFUL' ? 4 : 3), text);
   }
 });
 test('STYLE: claim replies', async () => {
   const run = (verdict: CheckResult['verdict']) => async () => base('CLAIM', verdict, 'Drinking bleach cures COVID-19.');
-  assert.equal((await drive({ text: 'Drinking bleach cures COVID-19.' }, 'private', { run: run('SCAM') })).replies[0], `🔴 This is false.\nTrusted websites say it is not true.\n${WARN}`);
+  assert.equal((await drive({ text: 'Drinking bleach cures COVID-19.' }, 'private', { run: run('SCAM') })).replies[0], `🔴 This is false.\nTrusted websites say it is not true.\n${CLAIM_WARN}`);
   assert.equal((await drive({ text: 'Argentina won the 2022 FIFA World Cup.' }, 'private', { run: run('SAFE') })).replies[0], '🟢 This looks true. Trusted websites agree.');
-  assert.match((await drive({ text: 'The economy is going to crash soon.' }, 'private', { run: run('CAREFUL') })).replies[0], /^🟡 We could not check if this is true\.\nNo trusted website clearly says yes or no\./);
+  assert.match((await drive({ text: 'The economy is going to crash soon.' }, 'private', { run: run('CAREFUL') })).replies[0], /^🟡 We could not check if this is true\.\nNo trusted website clearly says yes or no\.\n⚠️ Check trusted news before you share\.\nTip: send the news link or a screenshot of the post for a better check\.$/);
 });
 test('STYLE: payment and wallet replies are plain, "smart contract" always explained, no network lists', async () => {
   const wallet = base('PAYMENT', 'SAFE', ADDR, {}, { facts: [{ label: 'Networks', value: 'Ethereum, Base' }, { label: 'Type', value: 'A normal wallet' }, { label: 'Ethereum', value: '1.2 ETH · 120 transactions sent' }] });
