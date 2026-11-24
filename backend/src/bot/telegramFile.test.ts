@@ -16,9 +16,9 @@ test('downloads from Telegram with the token in the URL, and returns the bytes',
   });
 });
 test('too large (by Telegram size or by actual bytes) is a plain ImageError', async () => {
-  await assert.rejects(downloadTelegramFile(api({ file_path: 'a.jpg', file_size: 9_000_000 }), TOKEN, 'id'), (e: any) => e instanceof ImageError && /too large/.test(e.message));
+  await assert.rejects(downloadTelegramFile(api({ file_path: 'a.jpg', file_size: 9_000_000 }), TOKEN, 'id'), (e: any) => e instanceof ImageError && /too big/.test(e.message));
   await withFetch((async () => new Response(Buffer.alloc(200))) as any, async () => {
-    await assert.rejects(downloadTelegramFile(api({ file_path: 'a.jpg' }), TOKEN, 'id', 100), (e: any) => e instanceof ImageError && /too large/.test(e.message));
+    await assert.rejects(downloadTelegramFile(api({ file_path: 'a.jpg' }), TOKEN, 'id', 100), (e: any) => e instanceof ImageError && /too big/.test(e.message));
   });
 });
 test('network / API failures never leak the URL or the token', async () => {
@@ -30,6 +30,6 @@ test('network / API failures never leak the URL or the token', async () => {
   const broken = { getFile: async () => { throw new Error(`Call to getFile failed (token ${TOKEN})`); } } as any;
   await assert.rejects(downloadTelegramFile(broken, TOKEN, 'id'), (e: any) => e instanceof ImageError && !e.message.includes(TOKEN));
   await withFetch((async () => new Response('nope', { status: 404 })) as any, async () => {
-    await assert.rejects(downloadTelegramFile(api({ file_path: 'x.jpg' }), TOKEN, 'id'), (e: any) => e instanceof ImageError && /could not download/.test(e.message));
+    await assert.rejects(downloadTelegramFile(api({ file_path: 'x.jpg' }), TOKEN, 'id'), (e: any) => e instanceof ImageError && /could not download that picture/.test(e.message));
   });
 });

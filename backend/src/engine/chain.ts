@@ -33,7 +33,7 @@ export async function rpc(chain: ChainInfo, method: string, params: unknown[], t
   } catch { return { ok: false }; } finally { clearTimeout(timer); }
 }
 
-export type RpcTx = { hash: string; from: string; to: string | null; value: string; input: string };
+export type RpcTx = { hash: string; from: string; to: string | null; value: string; input: string; blockNumber?: string | null };
 
 export type TxSearch = {
   found?: { chain: ChainInfo; tx: RpcTx };
@@ -55,12 +55,18 @@ export async function findTx(hash: string): Promise<TxSearch> {
   return out;
 }
 
-/** 'success' | 'failed' | 'pending' (no receipt yet) | null (RPC did not answer) */
-export async function receiptStatus(chain: ChainInfo, hash: string): Promise<'success' | 'failed' | 'pending' | null> {
-  const r = await rpc(chain, 'eth_getTransactionReceipt', [hash]);
-  if (!r.ok) return null;
-  if (!r.result) return 'pending';
-  return r.result.status === '0x1' ? 'success' : 'failed';
+/**
+ * 'success' | 'failed' | 'pending' (not mined yet) | 'unknown' (mined, but the node gave no receipt) | null (RPC did not answer).
+ * A public RPC node sometimes returns no receipt for a transaction that is long mined: that must not read as "pending".
+ */
+export async function receiptStatus(chain: ChainInfo, hash: string, minedHint = false): Promise<'success' | 'failed' | 'pending' | 'unknown' | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const r = await rpc(chain, 'eth_getTransactionReceipt', [hash]);
+    if (!r.ok) return null;
+    if (r.result) return r.result.status === '0x1' ? 'success' : 'failed';
+    if (attempt === 0) await new Promise((res) => setTimeout(res, 600)); // give a lagging node one more try
+  }
+  return minedHint ? 'unknown' : 'pending';
 }
 
 /** true = contract, false = plain wallet, null = could not tell. */

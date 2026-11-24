@@ -13,16 +13,16 @@ export function safeError(e: unknown, token: string): string {
 export async function downloadTelegramFile(api: Api, token: string, fileId: string, maxBytes = MAX_IMAGE_BYTES): Promise<Buffer> {
   try {
     const f = await api.getFile(fileId);
-    if (!f.file_path) throw new ImageError('Telegram did not give me that file.');
-    if (f.file_size && f.file_size > maxBytes) throw new ImageError('That image is too large (max 5 MB).');
+    if (!f.file_path) throw new ImageError('Telegram did not give me that picture.');
+    if (f.file_size && f.file_size > maxBytes) throw new ImageError('This picture is too big. Please send one under 5 MB.');
     const res = await fetch(`https://api.telegram.org/file/bot${token}/${f.file_path}`, { signal: AbortSignal.timeout(15_000) });
-    if (!res.ok) throw new ImageError('I could not download that image.');
+    if (!res.ok) throw new ImageError('I could not download that picture.');
     const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.length > maxBytes) throw new ImageError('That image is too large (max 5 MB).');
+    if (buf.length > maxBytes) throw new ImageError('This picture is too big. Please send one under 5 MB.');
     return buf;
   } catch (e) {
     if (e instanceof ImageError) throw e;
     // Anything else (network errors, grammY errors) may mention the URL: replace it with a plain message.
-    throw new ImageError('I could not download that image.');
+    throw new ImageError('I could not download that picture.');
   }
 }
