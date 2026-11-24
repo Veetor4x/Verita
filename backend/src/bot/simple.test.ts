@@ -69,3 +69,9 @@ test('claim: a myth-wording-only answer is not shown as "says it is false"', () 
   const v = simpleReply(mk('CLAIM', 'CAREFUL', 'x is y', ['One source calls this claim a myth or scam, but nothing else could confirm it.']));
   assert.doesNotMatch(v.text, /says it is false/);
 });
+
+test('claim question: "No, this is false." / "Yes, this is true."; statement keeps the plain wording', () => {
+  assert.match(simpleReply(mk('CLAIM', 'SCAM', 'Is drinking bleach a cure for COVID?')).text, /🔴 No, this is false\./);
+  assert.match(simpleReply(mk('CLAIM', 'SAFE', 'Is Paris in France?')).text, /🟢 Yes, this is true\./);
+  assert.match(simpleReply(mk('CLAIM', 'SCAM', 'Drinking bleach cures COVID-19.')).text, /🔴 This is false\./);
+});

@@ -186,16 +186,23 @@ test('trusted link from ANOTHER miner counts: false answer + trusted link elsewh
   assert.equal(claimVerdict([sig('a', 'false'), sig('b', 'true', { urls: ['https://www.cdc.gov/x'] })]).verdict, 'CAREFUL');
 });
 
-import { isQuestionOrFuture, NO_INFO_REASON } from './claims.js';
-test('questions and future events are detected', () => {
-  for (const c of ['barcelona plays real madrid tomorrow?', 'Will it rain next week', 'Is the earth flat?', 'Real Madrid will play Barcelona', 'a new law is coming soon']) assert.ok(isQuestionOrFuture(c), c);
-  for (const c of ['Drinking bleach cures COVID-19.', 'Argentina won the 2022 FIFA World Cup.', 'The Eiffel Tower is in Paris, France.']) assert.ok(!isQuestionOrFuture(c), c);
+import { isFutureEvent, isQuestion, NO_INFO_REASON } from './claims.js';
+test('future events are detected; present-tense questions are not', () => {
+  for (const c of ['barcelona plays real madrid tomorrow?', 'Will it rain next week', 'Real Madrid will play Barcelona', 'a new law is coming soon', 'Is X going to happen?', 'the upcoming vote']) assert.ok(isFutureEvent(c), c);
+  for (const c of ['Is drinking bleach a cure for COVID?', 'Is this Elon giveaway real?', 'Drinking bleach cures COVID-19.', 'The Eiffel Tower is in Paris, France.']) assert.ok(!isFutureEvent(c), c);
 });
-test('question/future: never 🔴, even if a source says false or a trusted link exists', () => {
+test('questions are detected', () => {
+  for (const c of ['Is drinking bleach a cure for COVID?', 'does bleach cure covid', 'Bleach cures covid?']) assert.ok(isQuestion(c), c);
+  for (const c of ['Drinking bleach cures COVID-19.', 'They say a new law bans cash']) assert.ok(!isQuestion(c), c);
+});
+test('future event: never 🔴 or 🟢, even with a trusted link and a false/true answer', () => {
   const o = claimVerdict([sig('a', 'false', { urls: ['https://www.reuters.com/barcelona-real-madrid-tomorrow'] }), sig('b', 'unknown', { debunk: true })], 'barcelona plays real madrid tomorrow?');
   assert.equal(o.verdict, 'CAREFUL'); assert.equal(o.reasons[0], NO_INFO_REASON);
-  assert.equal(claimVerdict([sig('a', 'true', { urls: ['https://www.reuters.com/x-tomorrow'] })], 'Will x happen tomorrow?').verdict, 'CAREFUL'); // future cannot be confirmed
+  assert.equal(claimVerdict([sig('a', 'true', { urls: ['https://www.reuters.com/x-tomorrow'] })], 'Will x happen tomorrow?').verdict, 'CAREFUL');
 });
-test('a plain question can still be confirmed by a trusted source', () => {
-  assert.equal(claimVerdict([sig('a', 'true', { urls: ['https://www.britannica.com/x'] })], 'Is Paris in France?').verdict, 'CAREFUL'); // untrusted
+test('present-tense question: same trusted-source rule as the claim inside it', () => {
+  const bleach = 'Is drinking bleach a cure for COVID?';
+  assert.equal(claimVerdict([sig('a', 'false'), sig('b', 'unknown', { urls: ['https://www.cidrap.umn.edu/bleach-cure-covid'] })], bleach).verdict, 'SCAM');
+  assert.equal(claimVerdict([sig('a', 'true', { urls: ['https://www.nhs.uk/is-paris-in-france'] })], 'Is Paris in France?').verdict, 'SAFE');
+  assert.equal(claimVerdict([sig('a', 'false')], bleach).verdict, 'CAREFUL'); // no trusted link
 });

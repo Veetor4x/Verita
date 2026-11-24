@@ -53,5 +53,7 @@ Scorecard: **3 true claims → 1 🟢, 2 🟡 · 3 false claims → 1 🔴, 2 �
 | Vague claims (economy crash, cash ban) | 🟡 | nobody could verify |
 No claim reached 🟢 this run.
 
-## Questions and future events (Nov 24)
-A claim that is a question or about the future ("barcelona plays real madrid tomorrow?", "Will…", "…next week", "…soon") is never 🔴. Result: 🟡 *"We couldn't find reliable info on this yet."* (future events cannot be confirmed either). Plain questions ("Is Paris in France?") can still be 🟢 from a trusted source. Also, the bot only says "one website says it is false" when a source gave an explicit "false" verdict; myth/hoax wording alone now reads as "No trusted website clearly says yes or no." Tests: `claims.test.ts`, `simple.test.ts`.
+## Future events and questions (Nov 24)
+- **Future events** ("…tomorrow", "next week", "will", "going to", "soon", "upcoming") are never 🔴/🟢: 🟡 *"We couldn't find reliable info on this yet."*
+- **Present-tense questions** ("Is drinking bleach a cure for COVID?", "Is this Elon giveaway real?") are judged like the claim inside them, with the same trusted-source rule. Bot headline: 🔴 *"No, this is false."* / 🟢 *"Yes, this is true."*; statements keep "This is false." / "This looks true."
+- "One website says it is false" only appears for an explicit false verdict, not myth wording. Tests: `claims.test.ts`, `simple.test.ts`.
