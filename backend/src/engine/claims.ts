@@ -188,10 +188,34 @@ export function isQuestion(claim: string): boolean {
   const c = claim.trim().toLowerCase();
   return /\?\s*$/.test(c) || /^(is|are|was|were|does|do|did|can|could|should|would|has|have)\b/.test(c);
 }
+/**
+ * Turn a present-tense question into the statement inside it, so miners fact-check a claim, not a question.
+ * Simple rules only. "Is X a cure for Y?" -> "X cures Y"; "Is this giveaway real?" -> "This giveaway is real".
+ * Anything we do not recognise is returned as written (minus the question mark).
+ */
+export function questionToStatement(input: string): string {
+  const q = input.trim().replace(/\s+/g, ' ').replace(/[?\s]+$/, '');
+  if (!isQuestion(input)) return input;
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  let m = q.match(/^(?:is|are|was|were) (.+?) (?:a|an|the) (?:cure|treatment|remedy) (?:for|of|to) (.+)$/i);
+  if (m) return cap(`${m[1]} cures ${m[2]}`);
+  m = q.match(/^(is|are|was|were) (.+?) ((?:a|an|the|not|real|true|fake|false|safe|legit|legitimate|genuine|dangerous|harmful|a scam|scam|hoax|real or fake|still)\b.*)$/i);
+  if (m) return cap(`${m[2]} ${m[1].toLowerCase()} ${m[3]}`);
+  m = q.match(/^(does|do) (.+?) (cure|cause|prevent|kill|help|work|contain|give|cost|exist|ban|stop|treat|protect)\b(.*)$/i);
+  if (m) {
+    const verb = m[1].toLowerCase() === 'does' ? (/(?:s|sh|ch|x|z)$/.test(m[3].toLowerCase()) ? m[3] + 'es' : m[3] + 's') : m[3];
+    return cap(`${m[2]} ${verb}${m[4]}`);
+  }
+  m = q.match(/^(can|could) (.+?) ((?:cure|cause|prevent|kill|help|work|contain|give|cost|treat|protect|be|get|make)\b.*)$/i);
+  if (m) return cap(`${m[2]} ${m[1].toLowerCase()} ${m[3]}`);
+  m = q.match(/^(has|have) (.+?) ((?:been|won|lost|died|banned|stopped|started|ended|launched|signed|closed)\b.*)$/i);
+  if (m) return cap(`${m[2]} ${m[1].toLowerCase()} ${m[3]}`);
+  return cap(q);
+}
 export const NO_INFO_REASON = "We couldn't find reliable info on this yet.";
 
-export function claimVerdict(signals: ClaimSignal[], claim?: string): ClaimOutcome {
-  if (claim && isFutureEvent(claim)) {
+export function claimVerdict(signals: ClaimSignal[], claim?: string, original?: string): ClaimOutcome {
+  if (claim && isFutureEvent(original ?? claim)) {
     // Never true or false: it has not happened yet.
     const urls = [...new Set(signals.flatMap((s) => s.urls))].filter((u) => isRelevantUrl(claim, u));
     return { verdict: 'CAREFUL', reasons: [NO_INFO_REASON, claimBoughtLine(signals)].slice(0, 3), sourceLinks: urls.slice(0, 3), official: { status: urls.length ? 'CLOSE' : 'NOT_FOUND', links: [] } };

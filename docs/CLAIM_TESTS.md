@@ -57,3 +57,6 @@ No claim reached 🟢 this run.
 - **Future events** ("…tomorrow", "next week", "will", "going to", "soon", "upcoming") are never 🔴/🟢: 🟡 *"We couldn't find reliable info on this yet."*
 - **Present-tense questions** ("Is drinking bleach a cure for COVID?", "Is this Elon giveaway real?") are judged like the claim inside them, with the same trusted-source rule. Bot headline: 🔴 *"No, this is false."* / 🟢 *"Yes, this is true."*; statements keep "This is false." / "This looks true."
 - "One website says it is false" only appears for an explicit false verdict, not myth wording. Tests: `claims.test.ts`, `simple.test.ts`.
+
+## Question rewrite (Nov 24)
+Before buying, a present-tense question is rewritten into a statement with simple rules (no LLM): "Is X a cure for Y?" → "X cures Y", "Is this giveaway real?" → "This giveaway is real", "Does X cure Y?" → "X cures Y", "Can X…" → "X can…", "Has X been…" → "X has been…". Unknown shapes only lose the "?". Miners get the statement; the check keeps the original wording for the reply. Future events are still judged on the original text. Live check: "Is drinking bleach a cure for COVID?" went from 🟡 to 🔴 "No, this is false." (CIDRAP `.edu` link + one "false" answer, $0.04).
