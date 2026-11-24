@@ -143,14 +143,9 @@ export function landingPage(opts: { error?: string; text?: string } = {}): strin
 <div class="bg" aria-hidden="true"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="dots"></div><div class="spot"></div></div>
 
 <div class="wrap">
-<header class="top">
-  <a class="brand" href="/" aria-label="Verità home"><img src="/mark.svg" alt="" width="34" height="34">Verità</a>
-  <nav class="links" aria-label="Main"><a href="/stats">Stats</a><a href="${esc(GITHUB_URL)}" rel="noopener" target="_blank">GitHub</a></nav>
-</header>
 
 <main>
 <section class="hero">
-  <span class="chip"><i></i>Telegraph Hackathon S2 · Apps &amp; Agents</span>
   <div class="logo"><img src="/mark.svg" alt="" width="64" height="64"><span>Verità</span></div>
   <h1>Check before you <span class="grad">click, share or pay.</span></h1>
   <p class="lead">Send a link, message, screenshot or wallet. Get 🟢 safe, 🟡 careful or 🔴 scam.</p>
@@ -175,55 +170,19 @@ export function landingPage(opts: { error?: string; text?: string } = {}): strin
   </div>
 </section>
 
-<section aria-labelledby="demo-h">
-  <h2 id="demo-h">What you get</h2>
-  <p class="sub">Short answers. No jargon.</p>
-  <div class="demo">
-    <div class="vc r"><b>Scam. Don't open this link.</b><p>It pretends to be MetaMask. The real site is metamask.io.</p></div>
-    <div class="vc y"><b>Careful! This wallet is a copy.</b><p>It looks like one you used before. Check every character.</p></div>
-    <div class="vc g"><b>Looks safe.</b><p>We found no problems with this link.</p></div>
-  </div>
-</section>
-
 <section aria-labelledby="how-h">
   <h2 id="how-h">How it works</h2>
-  <p class="sub">Three steps.</p>
   <ol class="steps">
-    <li><b>You send it</b><span>A link, message, screenshot or wallet.</span></li>
-    <li><b>Our agent buys answers</b><span>It pays several Telegraph miners, and buys more if they disagree.</span></li>
-    <li><b>You get a simple answer</b><span>With receipts you can check.</span></li>
+    <li><b>You send it</b><span>a link, message or wallet.</span></li>
+    <li><b>Our agent buys answers</b><span>from Telegraph miners.</span></li>
+    <li><b>You get a simple answer</b><span>with receipts.</span></li>
   </ol>
-</section>
-
-<section aria-labelledby="catch-h">
-  <h2 id="catch-h">What it catches</h2>
-  <p class="sub">The tricks people fall for.</p>
-  <div class="bento">
-    <div class="tile"><span class="ic" aria-hidden="true">🎣</span><h3>Fake sites</h3><p>Links that copy a real bank, wallet or shop.</p></div>
-    <div class="tile"><span class="ic" aria-hidden="true">📰</span><h3>Fake news</h3><p>Claims that spread fast but are not true. We show where we looked.</p></div>
-    <div class="tile"><span class="ic" aria-hidden="true">👛</span><h3>Copied wallets</h3><p>A wallet that looks like one you used before.</p></div>
-    <div class="tile"><span class="ic" aria-hidden="true">🖼️</span><h3>Scam screenshots</h3><p>Send a picture. We read it and check the links in it.</p></div>
-    <div class="tile"><span class="ic" aria-hidden="true">🛡️</span><h3>Group guard</h3><p>Add the bot to a group. It checks every link posted.</p></div>
-  </div>
-</section>
-
-<section aria-labelledby="proof-h">
-  <h2 id="proof-h">Proof, not promises</h2>
-  <p class="sub">Real numbers from our own server. Every receipt can be checked on Telegraph.</p>
-  <div class="nums">
-    <div class="num"><strong data-stat="checks">–</strong><span>checks run</span></div>
-    <div class="num"><strong data-stat="receipts">–</strong><span>receipts</span></div>
-    <div class="num"><strong data-stat="spent">–</strong><span>test USDC spent</span></div>
-  </div>
-  <div class="marquee" aria-label="Latest receipts"><div class="track" id="track" data-verify="${esc(config.telegraphBaseUrl)}"></div></div>
-  <p class="more"><a href="/stats">See all the numbers →</a></p>
 </section>
 </main>
 
 <footer>
-  <div class="row"><a href="${TELEGRAM_BOT_URL}" rel="noopener" target="_blank">t.me/AskVeritaBot</a><a href="${esc(GITHUB_URL)}" rel="noopener" target="_blank">GitHub</a><a href="/stats">Stats</a></div>
-  <p>⚠️ Always check the official site before you act.</p>
-  <p>Testnet only. Built for Telegraph Protocol Hackathon S2.</p>
+  <div class="row"><a href="${TELEGRAM_BOT_URL}" rel="noopener" target="_blank">Telegram</a><a href="${esc(GITHUB_URL)}" rel="noopener" target="_blank">GitHub</a><a href="/stats">Proof &amp; receipts</a></div>
+  <p class="small">⚠️ Always check the official site before you act.</p>
 </footer>
 </div>
 </body></html>`;
