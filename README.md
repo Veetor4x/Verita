@@ -4,6 +4,8 @@
 
 **Check if a link, a news claim or a crypto payment is legit before you act on it. Every verdict is bought from several ranked [Telegraph](https://telegraphprotocol.com) miners, with on-chain receipts.**
 
+▶️ **Promo video:** [https://youtu.be/SAiHnsqHNUY](https://youtu.be/SAiHnsqHNUY)
+
 Built solo by [Veetor4x](https://github.com/Veetor4x) for the Telegraph Protocol Hackathon S2 (track: Apps & Agents). Testnet only (Ethereum Sepolia, test USDC).
 
 - **Live:** https://verita-znay.onrender.com (home page with a paste box, `/stats` with live receipts)
